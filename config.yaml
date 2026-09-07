@@ -1,0 +1,136 @@
+# Single source of truth for every seed, path and model parameter.
+# No numeric constant may be hardcoded in Python — see CLAUDE.md "Reproducibility".
+#
+# All model values below are transcribed from Renart et al. 2010 (see docs/paper/).
+# Provenance is given per block so any value can be traced back to the SOM.
+
+seed: 1234                     # sets random, numpy and framework RNGs at script startup
+
+paths:
+  raw: data/raw                # READ-ONLY. never written to.
+  processed: data/processed
+  artifacts: artifacts         # metrics, logs, figures, checkpoints
+
+logging:
+  metrics_file: artifacts/metrics.jsonl
+  log_file: artifacts/run.log
+  log_every_n_iterations: 1    # loss + NaN check logged every iteration
+
+# ---------------------------------------------------------------------------
+# Block 1 — feedforward postsynaptic pair (Fig. 1)
+# Provenance: SOM S-p.19-20. See docs/paper/01-postsynaptic-pair.md
+# ---------------------------------------------------------------------------
+pair_model:
+  neuron:                      # current-based LIF, V relative to rest (rest = 0)
+    tau_m_ms: 10.0
+    v_threshold_mV: 20.0
+    v_reset_mV: 10.0
+    t_refractory_ms: 2.0
+  synapse:
+    tau_s_ms: 5.0              # PSC decay (kick + exponential)
+    epsp_peak_mV: 0.75         # defines J_E by numerical calibration
+    ipsp_peak_mV: -0.75        # defines J_I by numerical calibration
+  inputs:
+    n_excitatory: 250
+    n_inhibitory: 220          # E+I condition only
+    rate_shared_sweep_hz: 5.0  # Fig. 1B
+    rate_correlated_sweep_hz: 20.0   # Fig. 1C,E-F -- see ambiguity note in docs
+    mother_train:
+      jitter_tau_ms: 5.0       # two-tailed exponential, zero mean
+  sweeps:
+    shared_fraction_p: [0.0, 0.4]    # Fig. 1B range
+    p_fixed: 0.2                     # Fig. 1C,E-F
+    r_in: [0.0, 0.4]                 # Fig. 1E range
+  simulation:
+    dt_ms: 0.05
+    length_s: 10000.0
+
+# ---------------------------------------------------------------------------
+# Block 2 — recurrent binary network (Fig. 2)
+# Provenance: SOM S-p.18-19. See docs/paper/02-binary-network.md
+# ---------------------------------------------------------------------------
+binary_network:
+  n_per_population: 4096       # N_E = N_I = N_X = N; total 3N units
+  connection_probability: 0.2  # p_ab, all population pairs
+  m_x: 0.1                     # external population mean activity
+  theta: 1.0                   # firing threshold, all cells
+  couplings:                   # j_ab, scaled by 1/sqrt(N) at build time (post <- pre)
+    j_EE: 5.0
+    j_EI: -10.0
+    j_IE: 5.0
+    j_II: -9.0
+    j_EX: 5.0
+    j_IX: 4.0
+  tau_ms: 10.0                 # tau_E = tau_I = tau_X; dt = tau / (3N)
+  sampling_rate_per_tau: 1     # SR: 1 instantaneous, 16 for lagged/CCG
+  simulation:
+    length_tau: 200000
+    n_realisations: 50         # Fig. 2C; 10 for Fig. 2F
+  robustness:                  # Fig. S4 sweep
+    lambda_E: [1.0, 2.0]       # scales j_EE and j_IE together
+    tau_I: [1.0, 2.0]          # relative to tau_E = 1
+
+# ---------------------------------------------------------------------------
+# Block 3 — recurrent conductance-based spiking network (Fig. 3)  [MAIN FOCUS]
+# Provenance: SOM S-p.20-21. See docs/paper/03-recurrent-spiking-network.md
+# ---------------------------------------------------------------------------
+spiking_network:
+  populations:
+    n_excitatory: 4000
+    n_inhibitory: 1000
+    n_external: 4000
+  connection_probability: 0.2
+  neuron:
+    c_m_nF: 0.25
+    g_L_nS: 16.7               # tau_m = C_m/g_L = 15 ms
+    v_leak_mV: -70.0
+    v_threshold_mV: -50.0
+    v_reset_mV: -60.0
+    t_refractory_excitatory_ms: 2.0
+    t_refractory_inhibitory_ms: 1.0
+  reversal_potentials_mV:
+    excitatory: 0.0            # V_rev^E = V_rev^X
+    inhibitory: -80.0
+  conductances_nS:             # mean g^ab (post <- pre)
+    g_EE: 2.4
+    g_EI: 40.0
+    g_IE: 4.8
+    g_II: 40.0
+    g_EX: 5.4
+    g_IX: 5.4
+    heterogeneity_std_fraction: 0.5   # g ~ Gaussian(mean, 0.5*mean); see ADR on negative samples
+  synapse:                     # difference of exponentials
+    tau_rise_ms: 1.0
+    tau_decay_ms: 5.0
+    tau_normalisation_ms: 1.0  # tau-tilde: keeps unitary conductance area constant
+  delays_ms:                   # uniform, sampled at 0.05 ms resolution
+    from_excitatory: [0.5, 1.5]
+    from_inhibitory: [0.1, 0.9]
+  external_input:
+    kind: poisson
+    rate_hz: 2.5
+  simulation:
+    integrator: rk2            # second-order Runge-Kutta
+    dt_ms: 0.05
+    length_s: 200.0            # 5000 s for the Fig. S6 characterisation run
+    n_networks: 10
+  expected:                    # reproduction targets, not inputs
+    rate_excitatory_hz: 1.0
+    rate_inhibitory_hz: 3.6
+    mean_correlation_EE_max: 0.001
+
+# ---------------------------------------------------------------------------
+# Analysis pipeline — shared by all blocks
+# Provenance: SOM S-p.24-28. See docs/paper/07-analysis-methods.md
+# ---------------------------------------------------------------------------
+analysis:
+  bin_dt_ms: 1.0
+  count_window_T_ms: 50.0
+  kernel: square               # square for simulated data, gaussian for in vivo
+  jitter:
+    J_over_T: 4.0              # J = 4T
+    n_surrogates: 500
+    significance_alpha: 0.01
+  ccg:
+    bin_dt_ms: 5.0
+    max_lag_ms: 50.0
