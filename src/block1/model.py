@@ -4,13 +4,27 @@ Per cell: tau_m dV/dt = -V + J_E*s_E(t) - J_I*s_I(t)  (if V < theta), spike/rese
 at threshold. s_E = sum of individual E-synapse traces onto that cell; since every individual
 trace obeys the same linear ds_i/dt = -s_i/tau_s + delta(t-t_i), their sum obeys the identical
 ODE driven by the pooled (merged) set of all E-population arrival times onto that cell -- so
-this model takes one pooled arrival-time array per cell per population, not per-input identity
-(see session notes: this simplification was confirmed with the researcher before implementing).
+this model takes one pooled arrival-time array per cell per population, not per-input identity.
+
+s_E(t)/s_I(t) are precomputed via block1.current_trace.synaptic_trace (ADR 0002) and fed to
+Brian2 as TimedArrays, rather than built from per-event SpikeGeneratorGroup/Synapses objects
+-- the latter doesn't scale to Fig. 1's real input volume (see ADR 0002). This is an internal
+rework only; the public seam (pooled arrival arrays in, PairResult out) is unchanged.
+
+Trade-off discovered while doing this rework (recorded in ADR 0002): TimedArray holds
+s_E/s_I piecewise-constant between dt-grid samples, whereas the old mechanism let Brian2
+exactly integrate V and the continuously-decaying s_E/s_I together within each timestep.
+This introduces a small O(dt/tau_s) bias in V (~0.1% at dt=0.01ms, tau_s=5ms) that wasn't
+present before -- V-derived quantities (PSP peaks, etc.) now need tolerances of a few
+tenths of a percent rather than near-exact; i_syn_a_mV/i_syn_b_mV (taken directly from the
+precomputed arrays, not from Brian2's integration) are unaffected and remain exact.
 """
 from dataclasses import dataclass
 
 import brian2 as b2
 import numpy as np
+
+from block1.current_trace import synaptic_trace
 
 
 @dataclass
@@ -22,16 +36,6 @@ class PairResult:
     i_syn_b_mV: np.ndarray
     spikes_a_ms: np.ndarray
     spikes_b_ms: np.ndarray
-
-
-def _spike_generator(spike_times_ms: list[float]) -> b2.SpikeGeneratorGroup:
-    # Pooled arrivals from many independent presynaptic inputs routinely land in the same
-    # dt bin. Brian2 forbids one SpikeGeneratorGroup neuron firing twice in a timestep, so
-    # give every pooled event its own virtual index (each fires at most once) rather than
-    # reusing a single index 0 -- Synapses below connects them all to the same target cell.
-    times = np.sort(np.asarray(spike_times_ms, dtype=float))
-    indices = np.arange(len(times))
-    return b2.SpikeGeneratorGroup(max(len(times), 1), indices, times * b2.ms)
 
 
 def simulate_pair(
@@ -59,68 +63,57 @@ def simulate_pair(
             if not (0 <= spike_time < duration_ms):
                 raise ValueError(
                     f"{name} contains {spike_time}ms, outside [0, {duration_ms}ms) -- "
-                    f"Brian2 silently drops out-of-range SpikeGeneratorGroup events, so "
-                    f"this is rejected explicitly rather than quietly undercounting input"
+                    f"rejected explicitly rather than quietly undercounting input"
                 )
+
+    s_e_a, _ = synaptic_trace(e_spikes_a, duration_ms, dt_ms, tau_s_ms)
+    s_i_a, _ = synaptic_trace(i_spikes_a, duration_ms, dt_ms, tau_s_ms)
+    s_e_b, _ = synaptic_trace(e_spikes_b, duration_ms, dt_ms, tau_s_ms)
+    s_i_b, _ = synaptic_trace(i_spikes_b, duration_ms, dt_ms, tau_s_ms)
+
+    i_syn_a_mV = j_e_mV * s_e_a - j_i_mV * s_i_a
+    i_syn_b_mV = j_e_mV * s_e_b - j_i_mV * s_i_b
 
     b2.start_scope()
     b2.defaultclock.dt = dt_ms * b2.ms
 
     tau_m = tau_m_ms * b2.ms
-    tau_s = tau_s_ms * b2.ms
-    J_E = j_e_mV * b2.mV
-    J_I = j_i_mV * b2.mV
     theta = theta_mV * b2.mV
     v_reset = v_reset_mV * b2.mV
     t_ref = t_ref_ms * b2.ms
 
+    # TimedArray's 2nd array dimension is indexed by neuron (`i`) when referenced as
+    # I_drive(t, i) in the equation -- Brian2's native way to give each neuron in a group
+    # its own time-varying input from one array, no per-event objects involved.
+    i_values = np.stack([i_syn_a_mV, i_syn_b_mV], axis=1) * b2.mV
+    i_drive = b2.TimedArray(i_values, dt=dt_ms * b2.ms)
+
     eqs = """
-    dV/dt = (-V + J_E*s_E - J_I*s_I)/tau_m : volt (unless refractory)
-    ds_E/dt = -s_E/tau_s : 1
-    ds_I/dt = -s_I/tau_s : 1
+    dV/dt = (-V + i_drive(t, i))/tau_m : volt (unless refractory)
     """
     cells = b2.NeuronGroup(
         2, eqs, threshold="V>theta", reset="V=v_reset", refractory=t_ref, method="exact"
     )
     cells.V = 0 * b2.mV
 
-    gen_e_a = _spike_generator(e_spikes_a)
-    gen_i_a = _spike_generator(i_spikes_a)
-    gen_e_b = _spike_generator(e_spikes_b)
-    gen_i_b = _spike_generator(i_spikes_b)
-
-    # Every pooled arrival is its own virtual source neuron (see _spike_generator); all of
-    # them target the same single postsynaptic cell, so connect all-of-source to one j.
-    # NOTE: j=0 (the integer) is falsy and trips Brian2's "must specify i, j or condition"
-    # check -- use the string index-expression form for the connect target instead.
-    syn_e_a = b2.Synapses(gen_e_a, cells, on_pre="s_E_post += 1")
-    syn_e_a.connect(j="0")
-    syn_i_a = b2.Synapses(gen_i_a, cells, on_pre="s_I_post += 1")
-    syn_i_a.connect(j="0")
-    syn_e_b = b2.Synapses(gen_e_b, cells, on_pre="s_E_post += 1")
-    syn_e_b.connect(j="1")
-    syn_i_b = b2.Synapses(gen_i_b, cells, on_pre="s_I_post += 1")
-    syn_i_b.connect(j="1")
-
-    state_mon = b2.StateMonitor(cells, ["V", "s_E", "s_I"], record=True)
+    state_mon = b2.StateMonitor(cells, "V", record=True)
     spike_mon = b2.SpikeMonitor(cells)
 
     b2.run(duration_ms * b2.ms)
 
     v = state_mon.V / b2.mV
-    s_e = state_mon.s_E
-    s_i = state_mon.s_I
-    i_syn = j_e_mV * s_e - j_i_mV * s_i
-
     spike_times_ms = spike_mon.t / b2.ms
     spike_indices = spike_mon.i[:]
 
+    t_ms = np.asarray(state_mon.t / b2.ms)
+    n = len(t_ms)
+
     return PairResult(
-        t_ms=np.asarray(state_mon.t / b2.ms),
+        t_ms=t_ms,
         v_a_mV=np.asarray(v[0]),
         v_b_mV=np.asarray(v[1]),
-        i_syn_a_mV=np.asarray(i_syn[0]),
-        i_syn_b_mV=np.asarray(i_syn[1]),
+        i_syn_a_mV=i_syn_a_mV[:n],
+        i_syn_b_mV=i_syn_b_mV[:n],
         spikes_a_ms=np.asarray(spike_times_ms[spike_indices == 0]),
         spikes_b_ms=np.asarray(spike_times_ms[spike_indices == 1]),
     )

@@ -47,8 +47,8 @@ def test_two_well_separated_e_spikes_onto_cell_a_each_peak_near_target_psp():
     peak_1 = v[(t >= 10.0) & (t < 25.0)].max()
     peak_2 = v[(t >= 100.0) & (t < 115.0)].max()
 
-    assert peak_1 == pytest.approx(0.75, rel=1e-3)
-    assert peak_2 == pytest.approx(0.75, rel=1e-3)
+    assert peak_1 == pytest.approx(0.75, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
+    assert peak_2 == pytest.approx(0.75, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
 
 
 def test_inputs_onto_cell_a_do_not_affect_cell_b():
@@ -80,7 +80,7 @@ def test_single_inhibitory_arrival_pushes_v_negative():
         duration_ms=50.0, dt_ms=0.01,
     )
 
-    assert result.v_a_mV.min() == pytest.approx(-0.75, rel=1e-3)
+    assert result.v_a_mV.min() == pytest.approx(-0.75, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
     assert len(result.spikes_a_ms) == 0
 
 
@@ -97,7 +97,7 @@ def test_simultaneous_pooled_arrivals_in_the_same_timestep_both_register():
         duration_ms=50.0, dt_ms=0.01,
     )
 
-    assert result.v_a_mV.max() == pytest.approx(1.5, rel=1e-3)
+    assert result.v_a_mV.max() == pytest.approx(1.5, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
 
 
 def test_inputs_onto_cell_b_do_not_affect_cell_a_and_produce_correct_peak():
@@ -115,7 +115,7 @@ def test_inputs_onto_cell_b_do_not_affect_cell_a_and_produce_correct_peak():
 
     assert len(result.spikes_a_ms) == 0
     assert np.allclose(result.v_a_mV, 0.0)
-    assert result.v_b_mV.max() == pytest.approx(0.75, rel=1e-3)
+    assert result.v_b_mV.max() == pytest.approx(0.75, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
 
 
 def test_synaptic_current_trace_matches_j_e_times_s_e_right_after_a_spike():

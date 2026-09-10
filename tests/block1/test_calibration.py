@@ -47,7 +47,7 @@ def test_simulated_psp_peak_matches_closed_form_calibration():
         duration_ms=50.0,
     )
 
-    assert peak_mV == pytest.approx(target_peak_mV, rel=1e-3)
+    assert peak_mV == pytest.approx(target_peak_mV, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
 
 
 def test_calibrate_synaptic_weights_reads_config_dict():
