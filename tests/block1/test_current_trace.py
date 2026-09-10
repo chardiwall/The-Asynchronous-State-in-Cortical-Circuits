@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 from block1.current_trace import synaptic_trace
-from block1.model import simulate_pair
 
 TAU_S_MS = 5.0
 DT_MS = 0.01
@@ -50,22 +49,46 @@ def test_zi_zf_chaining_matches_a_single_unchunked_call():
     assert chained == pytest.approx(whole, abs=1e-9)
 
 
-def test_matches_existing_brian2_mechanism_on_realistic_spike_train():
-    # Validation required by PROGRESS.md 3.4: the new precomputed-filter mechanism must
-    # agree with simulate_pair's existing (soon to be replaced) SpikeGeneratorGroup
-    # mechanism on the same input, before Phase 3.5 trusts it to take over. E-only,
-    # j_e_mV=1.0 makes i_syn_a_mV == s_E directly (i_syn = J_E*s_E - J_I*s_I, s_I=0).
+def test_matches_independent_from_scratch_reference():
+    # Independent reference: a plain per-sample Python loop (no lfilter, no Brian2), so
+    # a bug in the lfilter-based implementation can't also be present here by
+    # construction. Replaces a Brian2-comparison test that became tautological once
+    # model.py's Phase 3.5 rework made simulate_pair call synaptic_trace internally --
+    # at that point both sides of that comparison were the same function, so it could
+    # no longer catch a real regression (caught by review).
     rng = np.random.default_rng(99)
     duration_ms = 200.0
-    spikes = np.sort(rng.uniform(0, duration_ms - 1, 40)).tolist()
+    spikes = np.sort(rng.uniform(0, duration_ms - 1, 40))
 
-    trace, _ = synaptic_trace(spikes, duration_ms, DT_MS, TAU_S_MS)
+    trace, _ = synaptic_trace(spikes.tolist(), duration_ms, DT_MS, TAU_S_MS)
 
-    brian2_result = simulate_pair(
-        e_spikes_a=spikes, i_spikes_a=[], e_spikes_b=[], i_spikes_b=[],
-        j_e_mV=1.0, j_i_mV=1.0,
-        tau_m_ms=10.0, tau_s_ms=TAU_S_MS, theta_mV=20.0,
-        v_reset_mV=10.0, t_ref_ms=2.0, duration_ms=duration_ms, dt_ms=DT_MS,
-    )
+    n_bins = int(round(duration_ms / DT_MS))
+    a = np.exp(-DT_MS / TAU_S_MS)
+    counts = np.zeros(n_bins, dtype=int)
+    for s in spikes:
+        counts[int(s / DT_MS)] += 1
+    reference = np.zeros(n_bins)
+    for n in range(1, n_bins):
+        reference[n] = a * reference[n - 1] + counts[n - 1]
 
-    assert trace == pytest.approx(brian2_result.i_syn_a_mV, abs=1e-2)
+    assert trace == pytest.approx(reference, abs=1e-9)
+
+
+def test_spike_in_final_bin_is_carried_forward_not_dropped():
+    # Regression for a real bug caught by review: a spike landing in exactly the last
+    # dt-bin of a call must still flow into zf (the carried-forward state) even though
+    # it can't show up in THIS call's own trace (its effect starts at the next sample,
+    # which is the next chunk's sample 0). The old implementation shifted counts via
+    # `counts[:-1]` before filtering, which discarded the final bin's count entirely --
+    # it reached neither the trace nor zf, silently losing the spike across a chunk
+    # boundary despite the docstring's explicit "continue seamlessly" promise.
+    duration_ms = 40.0
+    spike_in_last_bin = 39.995  # bin index 3999 of 4000 -- the final bin
+
+    chunk_1, zf = synaptic_trace([spike_in_last_bin], duration_ms, DT_MS, TAU_S_MS)
+    chunk_2, _ = synaptic_trace([], duration_ms, DT_MS, TAU_S_MS, zi=zf)
+
+    whole, _ = synaptic_trace([spike_in_last_bin], 2 * duration_ms, DT_MS, TAU_S_MS)
+
+    assert np.concatenate([chunk_1, chunk_2]) == pytest.approx(whole, abs=1e-9)
+    assert chunk_2[0] > 0.0  # the spike's effect must appear at the next chunk's start

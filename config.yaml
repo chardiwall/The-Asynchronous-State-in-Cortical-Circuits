@@ -41,6 +41,7 @@ pair_model:
     shared_fraction_p: [0.0, 0.4]    # Fig. 1B range
     p_fixed: 0.2                     # Fig. 1C,E-F
     r_in: [0.0, 0.4]                 # Fig. 1E range
+    r_in_fig1f_example: 0.025        # blue circle of Fig. 1E; Fig. 1F's traces use this point
   simulation:
     dt_ms: 0.05
     length_s: 10000.0

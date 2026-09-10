@@ -138,3 +138,25 @@ def test_e_and_i_do_not_spuriously_correlate_when_r_in_zero():
     )
     cross_corr = _binned_correlation(result.e_spikes_a, result.i_spikes_a, duration_ms)
     assert cross_corr == pytest.approx(0.0, abs=0.1)
+
+
+def test_r_in_above_one_is_rejected():
+    # Regression for a real bug caught by review: r_in>1 makes mother_rate_hz=rate_hz/r_in
+    # drop BELOW rate_hz, so thinning at keep-probability r_in silently produces trains at
+    # the WRONG (lower) marginal rate instead of erroring -- e.g. r_in=2.0 gave ~10Hz
+    # trains when 20Hz was requested, with no exception anywhere in the call chain.
+    with pytest.raises(ValueError):
+        mother_train_pool(
+            rate_hz=20.0, r_in=2.0, n_children=2, duration_ms=1000.0,
+            jitter_tau_ms=5.0, rng=np.random.default_rng(RNG_SEED),
+        )
+
+
+def test_p_above_one_is_rejected():
+    # Regression for a real bug caught by review: p>1 makes n_shared_e>n_e, silently
+    # generating more literal-shared trains than n_e configures, with no error.
+    with pytest.raises(ValueError):
+        build_pair_inputs(
+            n_e=10, n_i=0, p=1.5, r_in=0.0, rate_hz=5.0,
+            duration_ms=1000.0, jitter_tau_ms=5.0, rng=np.random.default_rng(RNG_SEED),
+        )

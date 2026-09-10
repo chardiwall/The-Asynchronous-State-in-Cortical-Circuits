@@ -24,7 +24,7 @@ from dataclasses import dataclass
 import brian2 as b2
 import numpy as np
 
-from block1.current_trace import synaptic_trace
+from block1.current_trace import bin_edges, synaptic_trace
 
 
 @dataclass
@@ -66,13 +66,16 @@ def simulate_pair(
                     f"rejected explicitly rather than quietly undercounting input"
                 )
 
-    s_e_a, _ = synaptic_trace(e_spikes_a, duration_ms, dt_ms, tau_s_ms)
-    s_i_a, _ = synaptic_trace(i_spikes_a, duration_ms, dt_ms, tau_s_ms)
-    s_e_b, _ = synaptic_trace(e_spikes_b, duration_ms, dt_ms, tau_s_ms)
-    s_i_b, _ = synaptic_trace(i_spikes_b, duration_ms, dt_ms, tau_s_ms)
-
-    i_syn_a_mV = j_e_mV * s_e_a - j_i_mV * s_i_a
-    i_syn_b_mV = j_e_mV * s_e_b - j_i_mV * s_i_b
+    bins = bin_edges(duration_ms, dt_ms)
+    traces = {
+        name: synaptic_trace(spikes, duration_ms, dt_ms, tau_s_ms, bins=bins)[0]
+        for name, spikes in (
+            ("e_a", e_spikes_a), ("i_a", i_spikes_a),
+            ("e_b", e_spikes_b), ("i_b", i_spikes_b),
+        )
+    }
+    i_syn_a_mV = j_e_mV * traces["e_a"] - j_i_mV * traces["i_a"]
+    i_syn_b_mV = j_e_mV * traces["e_b"] - j_i_mV * traces["i_b"]
 
     b2.start_scope()
     b2.defaultclock.dt = dt_ms * b2.ms
@@ -106,14 +109,21 @@ def simulate_pair(
     spike_indices = spike_mon.i[:]
 
     t_ms = np.asarray(state_mon.t / b2.ms)
-    n = len(t_ms)
+    if len(t_ms) != len(i_syn_a_mV):
+        raise ValueError(
+            f"Brian2 produced {len(t_ms)} samples but synaptic_trace produced "
+            f"{len(i_syn_a_mV)} for duration_ms={duration_ms}, dt_ms={dt_ms} -- their "
+            f"sample-count conventions disagree for this (duration_ms, dt_ms) pair "
+            f"(Brian2's Clock rounds differently near non-exact multiples). Use a "
+            f"duration_ms that is an exact multiple of dt_ms."
+        )
 
     return PairResult(
         t_ms=t_ms,
         v_a_mV=np.asarray(v[0]),
         v_b_mV=np.asarray(v[1]),
-        i_syn_a_mV=i_syn_a_mV[:n],
-        i_syn_b_mV=i_syn_b_mV[:n],
+        i_syn_a_mV=i_syn_a_mV,
+        i_syn_b_mV=i_syn_b_mV,
         spikes_a_ms=np.asarray(spike_times_ms[spike_indices == 0]),
         spikes_b_ms=np.asarray(spike_times_ms[spike_indices == 1]),
     )

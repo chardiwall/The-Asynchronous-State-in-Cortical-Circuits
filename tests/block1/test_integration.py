@@ -14,6 +14,11 @@ from block1.model import simulate_pair
 from config import load_config
 
 
+def _zoh_bias_tol(dt_ms: float, tau_s_ms: float, safety_factor: float = 3.0) -> float:
+    """Tolerance for TimedArray's zero-order-hold bias (ADR 0002): O(dt/tau_s)."""
+    return safety_factor * dt_ms / tau_s_ms
+
+
 def _log(record: dict) -> None:
     with open("artifacts/metrics.jsonl", "a") as f:
         f.write(json.dumps(record) + "\n")
@@ -40,7 +45,8 @@ def test_phase1_calibration_against_real_config():
     )
     peak = float(result.v_a_mV.max())
     assert not np.isnan(peak)
-    assert peak == pytest.approx(synapse["epsp_peak_mV"], rel=5e-3)
+    tol = _zoh_bias_tol(check["dt_ms"], synapse["tau_s_ms"])
+    assert peak == pytest.approx(synapse["epsp_peak_mV"], rel=tol)
 
     _log({
         "timestamp": datetime.datetime.now().isoformat(),
@@ -112,7 +118,7 @@ def test_phase3_pipeline_handles_hundreds_of_thousands_of_pooled_events():
     duration_ms = 10_000.0  # 10s
     rate_hz = inputs_cfg["rate_correlated_sweep_hz"]  # 20 Hz, Fig. 1C/E/F
     p = config["pair_model"]["sweeps"]["p_fixed"]  # 0.2
-    r_in = 0.025  # Fig. 1F's operating point (blue circle of Fig. 1E)
+    r_in = config["pair_model"]["sweeps"]["r_in_fig1f_example"]
 
     inputs = build_pair_inputs(
         n_e=inputs_cfg["n_excitatory"], n_i=inputs_cfg["n_inhibitory"],

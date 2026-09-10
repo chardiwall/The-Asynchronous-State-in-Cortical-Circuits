@@ -11,6 +11,12 @@ V_RESET_MV = 10.0
 T_REF_MS = 2.0
 J_E_MV = 3.0
 J_I_MV = 3.0
+DT_MS = 0.01
+
+# TimedArray's zero-order-hold bias (ADR 0002): O(dt/tau_s). Derived from the formula
+# rather than a hand-picked constant. Observed bias was ~0.1% at DT_MS/TAU_S_MS (0.2%);
+# safety_factor of 3x comfortably covers that without missing a real regression.
+ZOH_BIAS_REL_TOL = 3 * DT_MS / TAU_S_MS
 
 
 def test_silence_produces_no_spikes_and_v_stays_at_rest():
@@ -47,8 +53,8 @@ def test_two_well_separated_e_spikes_onto_cell_a_each_peak_near_target_psp():
     peak_1 = v[(t >= 10.0) & (t < 25.0)].max()
     peak_2 = v[(t >= 100.0) & (t < 115.0)].max()
 
-    assert peak_1 == pytest.approx(0.75, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
-    assert peak_2 == pytest.approx(0.75, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
+    assert peak_1 == pytest.approx(0.75, rel=ZOH_BIAS_REL_TOL)
+    assert peak_2 == pytest.approx(0.75, rel=ZOH_BIAS_REL_TOL)
 
 
 def test_inputs_onto_cell_a_do_not_affect_cell_b():
@@ -80,7 +86,7 @@ def test_single_inhibitory_arrival_pushes_v_negative():
         duration_ms=50.0, dt_ms=0.01,
     )
 
-    assert result.v_a_mV.min() == pytest.approx(-0.75, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
+    assert result.v_a_mV.min() == pytest.approx(-0.75, rel=ZOH_BIAS_REL_TOL)
     assert len(result.spikes_a_ms) == 0
 
 
@@ -97,7 +103,7 @@ def test_simultaneous_pooled_arrivals_in_the_same_timestep_both_register():
         duration_ms=50.0, dt_ms=0.01,
     )
 
-    assert result.v_a_mV.max() == pytest.approx(1.5, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
+    assert result.v_a_mV.max() == pytest.approx(1.5, rel=ZOH_BIAS_REL_TOL)
 
 
 def test_inputs_onto_cell_b_do_not_affect_cell_a_and_produce_correct_peak():
@@ -115,7 +121,7 @@ def test_inputs_onto_cell_b_do_not_affect_cell_a_and_produce_correct_peak():
 
     assert len(result.spikes_a_ms) == 0
     assert np.allclose(result.v_a_mV, 0.0)
-    assert result.v_b_mV.max() == pytest.approx(0.75, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
+    assert result.v_b_mV.max() == pytest.approx(0.75, rel=ZOH_BIAS_REL_TOL)
 
 
 def test_synaptic_current_trace_matches_j_e_times_s_e_right_after_a_spike():
@@ -160,4 +166,20 @@ def test_spike_at_or_beyond_duration_is_rejected_not_silently_dropped():
             tau_m_ms=TAU_M_MS, tau_s_ms=TAU_S_MS, theta_mV=THETA_MV,
             v_reset_mV=V_RESET_MV, t_ref_ms=T_REF_MS,
             duration_ms=50.0, dt_ms=0.01,
+        )
+
+
+def test_non_exact_duration_dt_ratio_is_rejected_not_silently_misaligned():
+    # Regression for a real bug caught by review: Brian2's own Clock step-count and
+    # synaptic_trace's round(duration_ms/dt_ms) disagree for some (duration_ms, dt_ms)
+    # pairs (e.g. this one: Brian2 gives 3334 samples, synaptic_trace gives 3333), which
+    # used to be silently papered over by slicing i_syn_*_mV to Brian2's length -- leaving
+    # PairResult's fields correct-looking but built from a truncated trace with no error.
+    with pytest.raises(ValueError):
+        simulate_pair(
+            e_spikes_a=[], i_spikes_a=[], e_spikes_b=[], i_spikes_b=[],
+            j_e_mV=J_E_MV, j_i_mV=J_I_MV,
+            tau_m_ms=TAU_M_MS, tau_s_ms=TAU_S_MS, theta_mV=THETA_MV,
+            v_reset_mV=V_RESET_MV, t_ref_ms=T_REF_MS,
+            duration_ms=100.0, dt_ms=0.03,
         )

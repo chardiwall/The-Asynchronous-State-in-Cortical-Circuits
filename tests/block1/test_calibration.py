@@ -12,6 +12,15 @@ import pytest
 from block1.calibration import calibrate_synaptic_weights, psp_weight, simulate_psp_peak
 
 
+def _zoh_bias_tol(dt_ms: float, tau_s_ms: float, safety_factor: float = 3.0) -> float:
+    """Tolerance for TimedArray's zero-order-hold bias (ADR 0002): O(dt/tau_s). Derived
+    from the formula rather than a hand-picked constant, so it scales correctly if dt/tau
+    change -- observed bias was ~0.1% at dt=0.01ms/tau_s=5ms (dt/tau_s=0.2%); safety_factor
+    of 3x comfortably covers that without being loose enough to miss a real regression.
+    """
+    return safety_factor * dt_ms / tau_s_ms
+
+
 def test_psp_weight_matches_paper_time_constants():
     # tau_m=10ms, tau_s=5ms (S-p.19): t_peak = 10*ln2 ~= 6.9315ms, V_peak/J = 0.25,
     # so a 0.75mV target implies J = 3.0mV. Confirmed by sympy dsolve, a plain-Euler
@@ -47,7 +56,7 @@ def test_simulated_psp_peak_matches_closed_form_calibration():
         duration_ms=50.0,
     )
 
-    assert peak_mV == pytest.approx(target_peak_mV, rel=5e-3)  # O(dt/tau_s) TimedArray ZOH bias, see model.py docstring
+    assert peak_mV == pytest.approx(target_peak_mV, rel=_zoh_bias_tol(0.01, tau_s_ms))
 
 
 def test_calibrate_synaptic_weights_reads_config_dict():

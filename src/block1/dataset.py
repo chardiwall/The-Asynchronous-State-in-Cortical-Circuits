@@ -33,6 +33,9 @@ def mother_train_pool(
     jitter_tau_ms: float,
     rng: np.random.Generator,
 ) -> list[np.ndarray]:
+    if not (0.0 <= r_in <= 1.0):
+        raise ValueError(f"r_in must be in [0, 1] (it's a correlation), got {r_in}")
+
     if r_in == 0.0:
         return [_poisson_process(rate_hz, duration_ms, rng) for _ in range(n_children)]
 
@@ -74,6 +77,9 @@ def build_pair_inputs(
     the derivation showing this, not per-index-pair independent mothers, is required to
     reproduce M-Eq(1)'s N*r_in amplification).
     """
+    if not (0.0 <= p <= 1.0):
+        raise ValueError(f"p must be in [0, 1] (it's a shared fraction), got {p}")
+
     n_shared_e = int(np.floor(p * n_e))
     n_shared_i = int(np.floor(p * n_i))
     n_pool_e = n_e - n_shared_e
