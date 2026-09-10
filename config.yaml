@@ -34,7 +34,12 @@ pair_model:
     n_excitatory: 250
     n_inhibitory: 220          # E+I condition only
     rate_shared_sweep_hz: 5.0  # Fig. 1B
-    rate_correlated_sweep_hz: 20.0   # Fig. 1C,E-F -- see ambiguity note in docs
+    rate_correlated_sweep_hz: 20.0   # Fig. 1C,E-F E+I condition -- see ambiguity note in docs
+    rate_e_only_calibrated_hz: 4.0708   # Fig. 1E E-only curve -- resolves ambiguity 1
+      # (docs/paper/01-postsynaptic-pair.md): the paper's 20Hz is E+I-only; the E-only rate
+      # isn't stated, so it's calibrated by bisection (block1.calibrate_rate) to give 5Hz
+      # output at r_in=0. Value found 2026-09-10 at L=20,000ms (a longer one-time calibration
+      # run, not the fast-exploratory sweep scale); PROGRESS.md records the derivation.
     mother_train:
       jitter_tau_ms: 5.0       # two-tailed exponential, zero mean
   sweeps:

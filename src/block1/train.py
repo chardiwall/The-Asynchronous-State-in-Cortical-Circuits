@@ -6,6 +6,45 @@ from block1.dataset import build_pair_inputs
 from block1.model import simulate_pair
 
 
+def _run_point(
+    p: float,
+    r_in: float,
+    n_e: int,
+    n_i: int,
+    rate_hz: float,
+    j_e_mV: float,
+    j_i_mV: float,
+    tau_m_ms: float,
+    tau_s_ms: float,
+    theta_mV: float,
+    v_reset_mV: float,
+    t_ref_ms: float,
+    jitter_tau_ms: float,
+    duration_ms: float,
+    dt_ms: float,
+    bin_dt_ms: float,
+    window_T_ms: float,
+    rng: np.random.Generator,
+) -> dict:
+    inputs = build_pair_inputs(
+        n_e=n_e, n_i=n_i, p=p, r_in=r_in, rate_hz=rate_hz,
+        duration_ms=duration_ms, jitter_tau_ms=jitter_tau_ms, rng=rng,
+    )
+    result = simulate_pair(
+        e_spikes_a=inputs.e_spikes_a, i_spikes_a=inputs.i_spikes_a,
+        e_spikes_b=inputs.e_spikes_b, i_spikes_b=inputs.i_spikes_b,
+        j_e_mV=j_e_mV, j_i_mV=j_i_mV,
+        tau_m_ms=tau_m_ms, tau_s_ms=tau_s_ms, theta_mV=theta_mV,
+        v_reset_mV=v_reset_mV, t_ref_ms=t_ref_ms,
+        duration_ms=duration_ms, dt_ms=dt_ms,
+    )
+    c = stationary_correlation(result.i_syn_a_mV, result.i_syn_b_mV)
+    r_out = spike_count_correlation(
+        result.spikes_a_ms, result.spikes_b_ms, duration_ms, bin_dt_ms, window_T_ms
+    )
+    return {"p": p, "r_in": r_in, "c": c, "r_out": r_out}
+
+
 def run_p_sweep(
     p_values: list[float],
     n_e: int,
@@ -25,27 +64,45 @@ def run_p_sweep(
     window_T_ms: float,
     rng: np.random.Generator,
 ) -> list[dict]:
-    """Fig. 1B: E-only, r_in=0 fixed, p swept. Returns one {p, c, r_out} dict per
-    p_values entry, in order.
-    """
-    results = []
-    for p in p_values:
-        inputs = build_pair_inputs(
-            n_e=n_e, n_i=0, p=p, r_in=r_in, rate_hz=rate_hz,
-            duration_ms=duration_ms, jitter_tau_ms=jitter_tau_ms, rng=rng,
+    """Fig. 1B: E-only, r_in fixed (0 for the paper's panel), p swept."""
+    return [
+        _run_point(
+            p, r_in, n_e, 0, rate_hz, j_e_mV, j_i_mV, tau_m_ms, tau_s_ms, theta_mV,
+            v_reset_mV, t_ref_ms, jitter_tau_ms, duration_ms, dt_ms, bin_dt_ms,
+            window_T_ms, rng,
         )
-        result = simulate_pair(
-            e_spikes_a=inputs.e_spikes_a, i_spikes_a=inputs.i_spikes_a,
-            e_spikes_b=inputs.e_spikes_b, i_spikes_b=inputs.i_spikes_b,
-            j_e_mV=j_e_mV, j_i_mV=j_i_mV,
-            tau_m_ms=tau_m_ms, tau_s_ms=tau_s_ms, theta_mV=theta_mV,
-            v_reset_mV=v_reset_mV, t_ref_ms=t_ref_ms,
-            duration_ms=duration_ms, dt_ms=dt_ms,
-        )
-        c = stationary_correlation(result.i_syn_a_mV, result.i_syn_b_mV)
-        r_out = spike_count_correlation(
-            result.spikes_a_ms, result.spikes_b_ms, duration_ms, bin_dt_ms, window_T_ms
-        )
-        results.append({"p": p, "c": c, "r_out": r_out})
+        for p in p_values
+    ]
 
-    return results
+
+def run_r_in_sweep(
+    r_in_values: list[float],
+    n_e: int,
+    n_i: int,
+    p: float,
+    rate_hz: float,
+    j_e_mV: float,
+    j_i_mV: float,
+    tau_m_ms: float,
+    tau_s_ms: float,
+    theta_mV: float,
+    v_reset_mV: float,
+    t_ref_ms: float,
+    jitter_tau_ms: float,
+    duration_ms: float,
+    dt_ms: float,
+    bin_dt_ms: float,
+    window_T_ms: float,
+    rng: np.random.Generator,
+) -> list[dict]:
+    """Fig. 1E: p fixed (0.2), r_in swept. n_i=0 for the E-only curve, n_i=220 (with
+    the E+I rate) for the E+I curve.
+    """
+    return [
+        _run_point(
+            p, r_in, n_e, n_i, rate_hz, j_e_mV, j_i_mV, tau_m_ms, tau_s_ms, theta_mV,
+            v_reset_mV, t_ref_ms, jitter_tau_ms, duration_ms, dt_ms, bin_dt_ms,
+            window_T_ms, rng,
+        )
+        for r_in in r_in_values
+    ]
