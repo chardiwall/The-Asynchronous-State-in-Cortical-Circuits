@@ -43,6 +43,8 @@ def test_simulated_psp_peak_matches_closed_form_calibration():
         theta_mV=theta_mV,
         v_reset_mV=v_reset_mV,
         t_ref_ms=t_ref_ms,
+        dt_ms=0.01,
+        duration_ms=50.0,
     )
 
     assert peak_mV == pytest.approx(target_peak_mV, rel=1e-3)
@@ -65,3 +67,39 @@ def test_calibrate_synaptic_weights_reads_config_dict():
     # equation's own "+J_E...-J_I..." structure supplies inhibition's sign.
     assert j_e == pytest.approx(3.0)
     assert j_i == pytest.approx(3.0)
+
+
+def test_calibrate_synaptic_weights_rejects_wrong_sign_epsp():
+    # A config transcription error making epsp_peak_mV negative must fail loudly, not
+    # silently produce a negative J_E (which would flip the excitatory synapse to
+    # inhibitory without any error or test noticing).
+    config = {
+        "pair_model": {
+            "neuron": {"tau_m_ms": 10.0},
+            "synapse": {"tau_s_ms": 5.0, "epsp_peak_mV": -0.75, "ipsp_peak_mV": -0.75},
+        }
+    }
+    with pytest.raises(ValueError):
+        calibrate_synaptic_weights(config)
+
+
+def test_calibrate_synaptic_weights_rejects_wrong_sign_ipsp():
+    config = {
+        "pair_model": {
+            "neuron": {"tau_m_ms": 10.0},
+            "synapse": {"tau_s_ms": 5.0, "epsp_peak_mV": 0.75, "ipsp_peak_mV": 0.75},
+        }
+    }
+    with pytest.raises(ValueError):
+        calibrate_synaptic_weights(config)
+
+
+def test_psp_weight_rejects_tau_s_not_less_than_tau_m():
+    # The double-exponential PSP formula requires tau_m > tau_s (S-p.19: 10ms vs 5ms);
+    # tau_s >= tau_m divides by zero or a negative number and no longer represents a
+    # valid PSP peak. A config edit that violated this should fail with a clear error,
+    # not an uninformative ZeroDivisionError or a silently wrong value.
+    with pytest.raises(ValueError):
+        psp_weight(tau_m_ms=5.0, tau_s_ms=5.0, target_peak_mV=0.75)
+    with pytest.raises(ValueError):
+        psp_weight(tau_m_ms=5.0, tau_s_ms=10.0, target_peak_mV=0.75)

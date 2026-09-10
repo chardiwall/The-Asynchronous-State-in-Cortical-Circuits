@@ -44,6 +44,9 @@ pair_model:
   simulation:
     dt_ms: 0.05
     length_s: 10000.0
+  calibration_check:            # single-spike PSP verification harness (Phase 1 self-check),
+    dt_ms: 0.01                 # distinct from the production sweep's dt/length above --
+    duration_ms: 50.0           # this only needs to resolve one ~7ms-peaked PSP cleanly
 
 # ---------------------------------------------------------------------------
 # Block 2 — recurrent binary network (Fig. 2)
