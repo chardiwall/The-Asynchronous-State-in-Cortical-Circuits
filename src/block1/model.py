@@ -27,6 +27,20 @@ import numpy as np
 from block1.current_trace import bin_edges, synaptic_trace
 
 
+def _advance_one_step(v_last_mV: float, i_last_mV: float, dt_ms: float, tau_m_ms: float) -> float:
+    """Brian2's StateMonitor records V *before* each step's update (when='start'), so
+    v[-1] is the state at duration-dt, not duration -- missing exactly one step's
+    evolution. For chunked runs (block1.chunked) this matters: the next chunk's initial
+    V must be the state at the true chunk boundary. Closed-form exact update for
+    tau_m*dV/dt=-V+I with I held constant over one dt (matching TimedArray's own
+    zero-order hold): V(t+dt) = I + (V(t)-I)*exp(-dt/tau_m) -- the same formula Brian2's
+    own method='exact' integrator uses for this linear ODE, verified to match Brian2's
+    own output bit-for-bit in tests/block1/test_model_chunking.py.
+    """
+    a = np.exp(-dt_ms / tau_m_ms)
+    return float(i_last_mV + (v_last_mV - i_last_mV) * a)
+
+
 @dataclass
 class PairResult:
     t_ms: np.ndarray
@@ -36,6 +50,15 @@ class PairResult:
     i_syn_b_mV: np.ndarray
     spikes_a_ms: np.ndarray
     spikes_b_ms: np.ndarray
+    # Carry-forward state for chunked runs (block1.chunked): the final V of each cell,
+    # and the final synaptic_trace filter state (zf) of each of the 4 (cell, population)
+    # traces. Pass these as the next chunk's v_init_*/zi_* to continue seamlessly.
+    v_a_final_mV: float
+    v_b_final_mV: float
+    zf_e_a: np.ndarray
+    zf_i_a: np.ndarray
+    zf_e_b: np.ndarray
+    zf_i_b: np.ndarray
 
 
 def simulate_pair(
@@ -52,6 +75,12 @@ def simulate_pair(
     t_ref_ms: float,
     duration_ms: float,
     dt_ms: float,
+    v_init_a_mV: float = 0.0,
+    v_init_b_mV: float = 0.0,
+    zi_e_a: np.ndarray | None = None,
+    zi_i_a: np.ndarray | None = None,
+    zi_e_b: np.ndarray | None = None,
+    zi_i_b: np.ndarray | None = None,
 ) -> PairResult:
     for name, spikes in (
         ("e_spikes_a", e_spikes_a),
@@ -67,13 +96,15 @@ def simulate_pair(
                 )
 
     bins = bin_edges(duration_ms, dt_ms)
-    traces = {
-        name: synaptic_trace(spikes, duration_ms, dt_ms, tau_s_ms, bins=bins)[0]
-        for name, spikes in (
-            ("e_a", e_spikes_a), ("i_a", i_spikes_a),
-            ("e_b", e_spikes_b), ("i_b", i_spikes_b),
+    zi_by_name = {"e_a": zi_e_a, "i_a": zi_i_a, "e_b": zi_e_b, "i_b": zi_i_b}
+    traces, zf_by_name = {}, {}
+    for name, spikes in (
+        ("e_a", e_spikes_a), ("i_a", i_spikes_a),
+        ("e_b", e_spikes_b), ("i_b", i_spikes_b),
+    ):
+        traces[name], zf_by_name[name] = synaptic_trace(
+            spikes, duration_ms, dt_ms, tau_s_ms, zi=zi_by_name[name], bins=bins
         )
-    }
     i_syn_a_mV = j_e_mV * traces["e_a"] - j_i_mV * traces["i_a"]
     i_syn_b_mV = j_e_mV * traces["e_b"] - j_i_mV * traces["i_b"]
 
@@ -97,7 +128,7 @@ def simulate_pair(
     cells = b2.NeuronGroup(
         2, eqs, threshold="V>theta", reset="V=v_reset", refractory=t_ref, method="exact"
     )
-    cells.V = 0 * b2.mV
+    cells.V = [v_init_a_mV, v_init_b_mV] * b2.mV
 
     state_mon = b2.StateMonitor(cells, "V", record=True)
     spike_mon = b2.SpikeMonitor(cells)
@@ -126,4 +157,10 @@ def simulate_pair(
         i_syn_b_mV=i_syn_b_mV,
         spikes_a_ms=np.asarray(spike_times_ms[spike_indices == 0]),
         spikes_b_ms=np.asarray(spike_times_ms[spike_indices == 1]),
+        v_a_final_mV=_advance_one_step(v[0][-1], i_syn_a_mV[-1], dt_ms, tau_m_ms),
+        v_b_final_mV=_advance_one_step(v[1][-1], i_syn_b_mV[-1], dt_ms, tau_m_ms),
+        zf_e_a=zf_by_name["e_a"],
+        zf_i_a=zf_by_name["i_a"],
+        zf_e_b=zf_by_name["e_b"],
+        zf_i_b=zf_by_name["i_b"],
     )

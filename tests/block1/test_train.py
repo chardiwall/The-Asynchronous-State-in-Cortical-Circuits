@@ -50,6 +50,20 @@ def test_c_is_higher_at_p_one_than_p_zero():
     assert c_at_p1 > c_at_p0
 
 
+def test_chunked_sweep_matches_unchunked_sweep():
+    # chunk_duration_ms=None (default) uses simulate_pair directly, unchunked -- the
+    # scale every other test in this file runs at. Passing it uses simulate_pair_chunked
+    # (ADR 0002's deferred piece, needed for Fig. 1's real L=10,000s scale). Same seed
+    # must give identical results either way -- chunking is an internal-only change.
+    unchunked = run_p_sweep(p_values=[0.2], rng=np.random.default_rng(7), **COMMON_KWARGS)
+    chunked = run_p_sweep(
+        p_values=[0.2], rng=np.random.default_rng(7), chunk_duration_ms=500.0,
+        **COMMON_KWARGS,
+    )
+    assert chunked[0]["c"] == pytest.approx(unchunked[0]["c"], abs=1e-9)
+    assert chunked[0]["r_out"] == pytest.approx(unchunked[0]["r_out"], abs=1e-9)
+
+
 def test_r_in_sweep_returns_one_result_per_r_in_value():
     results = run_r_in_sweep(
         r_in_values=[0.0, 0.1], n_i=0, p=0.2, rng=np.random.default_rng(10),
