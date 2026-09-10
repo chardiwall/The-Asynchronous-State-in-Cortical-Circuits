@@ -29,11 +29,6 @@ data/raw/*
 *.pdf
 paper.md
 docs/paper/*.md
-AGENTS.md
-CLAUDE.md
-CONTEXT.md
-PROGRESS.md
-reviews.md
 
 # OS / editor
 .DS_Store
