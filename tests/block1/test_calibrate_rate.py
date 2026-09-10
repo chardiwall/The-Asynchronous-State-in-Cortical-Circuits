@@ -41,7 +41,7 @@ def test_calibrated_rate_produces_output_close_to_target():
     calibrated_rate_hz = calibrate_e_only_input_rate(
         target_output_hz=target_hz,
         rate_low_hz=1.0, rate_high_hz=20.0,
-        tolerance_hz=1.0, max_iterations=12,
+        tolerance_hz=1.0, max_iterations=12, n_trials=3,
         rng=np.random.default_rng(42),
         **COMMON_KWARGS,
     )
@@ -58,8 +58,61 @@ def test_calibrated_rate_is_well_below_the_e_plus_i_rate():
     calibrated_rate_hz = calibrate_e_only_input_rate(
         target_output_hz=5.0,
         rate_low_hz=1.0, rate_high_hz=20.0,
-        tolerance_hz=1.0, max_iterations=12,
+        tolerance_hz=1.0, max_iterations=12, n_trials=3,
         rng=np.random.default_rng(43),
         **COMMON_KWARGS,
     )
     assert calibrated_rate_hz < 20.0
+
+
+def test_bounds_not_bracketing_target_raises():
+    # Regression for a real bug caught by review: bisection with bounds that don't
+    # actually bracket the target must fail loudly, not silently converge to one edge
+    # and return it as if calibration succeeded.
+    with pytest.raises(ValueError):
+        calibrate_e_only_input_rate(
+            target_output_hz=5.0,
+            rate_low_hz=0.01, rate_high_hz=0.05,  # both far too low to reach 5Hz
+            tolerance_hz=0.5, max_iterations=5, n_trials=2,
+            rng=np.random.default_rng(44),
+            **COMMON_KWARGS,
+        )
+
+
+def test_exhausting_iterations_without_converging_raises():
+    # Regression for a real bug caught by review: running out of max_iterations without
+    # meeting tolerance must fail loudly, not silently return an unconverged mid as if
+    # it were a successful calibration.
+    with pytest.raises(ValueError):
+        calibrate_e_only_input_rate(
+            target_output_hz=5.0,
+            rate_low_hz=1.0, rate_high_hz=20.0,
+            tolerance_hz=1e-6, max_iterations=1, n_trials=1,  # impossible to converge
+            rng=np.random.default_rng(45),
+            **COMMON_KWARGS,
+        )
+
+
+def test_averaging_multiple_trials_reduces_single_run_noise_sensitivity():
+    # The bug this fixes: a single stochastic simulate_pair run per bisection step can
+    # violate the monotonicity assumption bisection depends on (expected count ~25
+    # spikes at L=5s/5Hz, ~20% Poisson relative noise -- comparable to the old
+    # tolerance_hz=1.0). n_trials>1 averages independent replicates at each candidate
+    # rate, reducing that noise by ~sqrt(n_trials). Just checks it still converges
+    # sensibly with averaging enabled -- the noise-reduction itself isn't directly
+    # observable in a single calibration run, but this exercises the averaging path.
+    calibrated_rate_hz = calibrate_e_only_input_rate(
+        target_output_hz=5.0,
+        rate_low_hz=1.0, rate_high_hz=20.0,
+        tolerance_hz=1.0, max_iterations=12, n_trials=3,
+        rng=np.random.default_rng(46),
+        **COMMON_KWARGS,
+    )
+    # Average 3 independent verification runs rather than trusting one -- a single run
+    # at this scale (expected count ~25, ~20% Poisson relative noise) is exactly the
+    # kind of noisy single-sample measurement this fix addresses; averaging the check
+    # itself avoids the test being flaky for the same underlying reason.
+    verification_hz = np.mean(
+        [_measure_output_rate_hz(calibrated_rate_hz, seed=1001 + i) for i in range(3)]
+    )
+    assert verification_hz == pytest.approx(5.0, abs=2.0)

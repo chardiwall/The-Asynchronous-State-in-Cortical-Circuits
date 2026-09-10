@@ -61,6 +61,15 @@ def _pool(trains: list[np.ndarray]) -> np.ndarray:
     return np.sort(np.concatenate(trains))
 
 
+def shared_count(p: float, n: int) -> int:
+    """floor(p*n), guarded against p*n's binary floating-point representation landing
+    just below an intended integer (e.g. (11/15)*150 == 109.99999999999999 in float64,
+    not 110.0) -- a real bug caught by review that silently moved one train from
+    "shared" to "pooled" for specific (p, n) combinations.
+    """
+    return int(np.floor(p * n + 1e-9))
+
+
 def build_pair_inputs(
     n_e: int,
     n_i: int,
@@ -80,8 +89,8 @@ def build_pair_inputs(
     if not (0.0 <= p <= 1.0):
         raise ValueError(f"p must be in [0, 1] (it's a shared fraction), got {p}")
 
-    n_shared_e = int(np.floor(p * n_e))
-    n_shared_i = int(np.floor(p * n_i))
+    n_shared_e = shared_count(p, n_e)
+    n_shared_i = shared_count(p, n_i)
     n_pool_e = n_e - n_shared_e
     n_pool_i = n_i - n_shared_i
 

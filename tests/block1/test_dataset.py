@@ -8,7 +8,7 @@ this is required to reproduce M-Eq(1)'s N*r_in amplification (see PROGRESS.md de
 import numpy as np
 import pytest
 
-from block1.dataset import build_pair_inputs, mother_train_pool
+from block1.dataset import build_pair_inputs, mother_train_pool, shared_count
 
 RNG_SEED = 1234
 
@@ -160,3 +160,16 @@ def test_p_above_one_is_rejected():
             n_e=10, n_i=0, p=1.5, r_in=0.0, rate_hz=5.0,
             duration_ms=1000.0, jitter_tau_ms=5.0, rng=np.random.default_rng(RNG_SEED),
         )
+
+
+def test_shared_count_is_not_off_by_one_from_floating_point_imprecision():
+    # Regression for a real bug caught by review: p*n isn't always exactly
+    # representable -- e.g. (11/15)*150 evaluates to 109.99999999999999 in float64, so
+    # a raw floor() gives 109 instead of the mathematically intended 110, silently
+    # shifting one train from "shared" to "pooled" for specific (p, n) combinations.
+    assert shared_count(11 / 15, 150) == 110  # 0.7333...*150 = 109.99999999999999
+    assert shared_count(11 / 15, 300) == 220  # 0.7333...*300 = 219.99999999999997
+    assert shared_count(6 / 11, 220) == 120  # 0.5454...*220 = 119.99999999999999
+    assert shared_count(3 / 11, 220) == 60  # 0.2727...*220 = 59.99999999999999
+    assert shared_count(0.0, 250) == 0
+    assert shared_count(1.0, 250) == 250

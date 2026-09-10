@@ -106,8 +106,9 @@ def test_fig1b_fast_exploratory_pass_against_real_config():
 
     # Paper's stated qualitative result (docs/paper/01-postsynaptic-pair.md): "c and
     # r_out grow roughly linearly with p; both stay moderate (<=0.4-ish at p=0.4)".
-    assert check_increasing_trend(p_values, c_values)
-    assert check_increasing_trend(p_values, r_out_values)
+    min_corr = config["qualitative_checks"]["increasing_trend_min_correlation"]
+    assert check_increasing_trend(p_values, c_values, min_corr)
+    assert check_increasing_trend(p_values, r_out_values, min_corr)
 
     timestamp = datetime.datetime.now().isoformat()
     record = {
@@ -165,7 +166,8 @@ def test_fig1e_fast_exploratory_pass_against_real_config():
 
     # Paper's stated qualitative results: E-only rises steeply; E+I is "strongly
     # suppressed" across the same r_in range -- E-only should end up well above E+I.
-    assert check_increasing_trend(r_in_values, e_only_c)
+    min_corr = config["qualitative_checks"]["increasing_trend_min_correlation"]
+    assert check_increasing_trend(r_in_values, e_only_c, min_corr)
     assert e_only_c[-1] > e_plus_i_c[-1]
     assert e_only_r_out[-1] > e_plus_i_r_out[-1]
 
