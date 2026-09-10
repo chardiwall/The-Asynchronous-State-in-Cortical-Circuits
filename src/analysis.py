@@ -51,3 +51,22 @@ def spike_count_correlation(
     n_i = windowed_rate(spike_times_i_ms, duration_ms, bin_dt_ms, window_T_ms)
     n_j = windowed_rate(spike_times_j_ms, duration_ms, bin_dt_ms, window_T_ms)
     return stationary_correlation(n_i, n_j)
+
+
+def exact_current_correlation(p: float, r_in: float, n: int) -> float:
+    """Main text ref. 15 (exact): for two sums of N variables each pairwise-correlated
+    by r_in, of which N*p are literally common:
+        c = [p + r_in*(N-p)] / [1 + r_in*(N-1)]
+    Assumes a "static"/long-run notion of pairwise correlation -- see PROGRESS.md
+    Phase 8 for why this differs from a short-timescale (e.g. PSC-filtered) measured c
+    under the mother-train method's temporal jitter.
+    """
+    return (p + r_in * (n - p)) / (1 + r_in * (n - 1))
+
+
+def approx_meq1_current_correlation(p: float, r_in: float, n: int) -> float:
+    """M-Eq(1): c ~= p + N*r_in, valid only when p ~ r_in*N << 1 (first-order expansion
+    of exact_current_correlation for small r_in*N). Can exceed 1 outside that regime --
+    not clipped, so a caller can detect when the approximation has broken down.
+    """
+    return p + n * r_in
