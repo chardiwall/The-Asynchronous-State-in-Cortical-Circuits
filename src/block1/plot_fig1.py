@@ -27,11 +27,12 @@ import numpy as np
 
 from block1.calibration import calibrate_synaptic_weights
 from block1.current_trace import synaptic_trace
-from block1.dataset import build_pair_inputs
+from block1.dataset import build_pair_inputs, mother_train_pool
 from block1.model import simulate_pair
 
 BLUE = "#2a78d6"
 ORANGE = "#eb6834"
+N_DISPLAY_TRAINS = 30  # illustrative raster row count -- see _example_raster_trains
 
 
 def load_full_pass_csv(path: str) -> dict[str, list[dict]]:
@@ -120,6 +121,22 @@ def _example_point(config: dict) -> tuple[float, float]:
     return p, r_in
 
 
+def _example_raster_trains(
+    rate_hz: float, r_in: float, duration_ms: float, jitter_tau_ms: float,
+    rng: np.random.Generator, n_display: int = N_DISPLAY_TRAINS,
+) -> list[np.ndarray]:
+    """A legible subsample of N_DISPLAY_TRAINS individual input trains, correlated at
+    r_in (mother_train_pool, public), for the raster panel -- showing all ~250-470 real
+    trains pooled into one row (this model's actual internal representation,
+    block1/dataset.py) would render as a solid, illegible block at any duration long
+    enough to show interesting dynamics; a real per-synapse raster figure subsamples for
+    display too. Not the literal trains driving the current/V traces plotted alongside
+    it (those come from the pooled construction) -- drawn at the same rate_hz/r_in so
+    the displayed correlation structure matches what's actually driving the cell.
+    """
+    return mother_train_pool(rate_hz, r_in, n_display, duration_ms, jitter_tau_ms, rng)
+
+
 def _plot_membrane_panel(ax, result) -> None:
     """The bottom row shared by Fig. 1C and 1F: both cells' V_m, scale-barred."""
     ax.plot(result.t_ms, result.v_a_mV, color="black")
@@ -151,9 +168,15 @@ def plot_fig1c(config: dict, duration_ms: float, rng: np.random.Generator, out_p
         dt_ms=config["pair_model"]["simulation"]["dt_ms"],
     )
 
+    raster_trains = _example_raster_trains(
+        inputs_cfg["rate_e_only_calibrated_hz"], r_in, duration_ms,
+        inputs_cfg["mother_train"]["jitter_tau_ms"], rng,
+    )
+
     fig, axes = plt.subplots(3, 1, figsize=(9, 7))
-    axes[0].eventplot([inputs.e_spikes_b, inputs.e_spikes_a], lineoffsets=[0, 1], linelengths=0.8, colors="green")
-    axes[0].set_yticks([0, 1]); axes[0].set_yticklabels(["cell B", "cell A"])
+    axes[0].eventplot(raster_trains, colors="green", linelengths=0.8)
+    axes[0].set_ylabel(f"{len(raster_trains)} example E inputs")
+    axes[0].set_yticks([])
     axes[0].set_xlim(0, duration_ms)
     axes[0].set_title(f"Fig. 1C (E inputs only, p={p}, r_in={r_in}): input raster")
 
@@ -202,12 +225,22 @@ def plot_fig1f(config: dict, duration_ms: float, rng: np.random.Generator, out_p
     i_e_a = j_e * s_e_a
     i_i_a = -j_i * s_i_a
 
-    fig, axes = plt.subplots(3, 1, figsize=(9, 7))
-    axes[0].eventplot(
-        [inputs.i_spikes_a, inputs.e_spikes_a], lineoffsets=[0, 1], linelengths=0.8,
-        colors=["red", "green"],
+    n_each = N_DISPLAY_TRAINS // 2
+    e_trains = _example_raster_trains(
+        inputs_cfg["rate_correlated_sweep_hz"], r_in, duration_ms,
+        inputs_cfg["mother_train"]["jitter_tau_ms"], rng, n_display=n_each,
     )
-    axes[0].set_yticks([0, 1]); axes[0].set_yticklabels(["I -> cell A", "E -> cell A"])
+    i_trains = _example_raster_trains(
+        inputs_cfg["rate_correlated_sweep_hz"], r_in, duration_ms,
+        inputs_cfg["mother_train"]["jitter_tau_ms"], rng, n_display=n_each,
+    )
+
+    fig, axes = plt.subplots(3, 1, figsize=(9, 7))
+    axes[0].eventplot(list(i_trains) + list(e_trains),
+                       colors=["red"] * n_each + ["green"] * n_each, linelengths=0.8)
+    axes[0].axhline(n_each - 0.5, color="0.7", linewidth=1)
+    axes[0].set_yticks([n_each / 2 - 0.5, n_each + n_each / 2 - 0.5])
+    axes[0].set_yticklabels(["I -> cell A", "E -> cell A"])
     axes[0].set_xlim(0, duration_ms)
     axes[0].set_title(f"Fig. 1F (E and I inputs, p={p}, r_in={r_in}): input raster")
 
