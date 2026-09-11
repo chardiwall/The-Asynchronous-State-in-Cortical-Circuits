@@ -30,6 +30,7 @@ def calibrate_e_only_input_rate(
     t_ref_ms: float,
     duration_ms: float,
     dt_ms: float,
+    jitter_tau_ms: float,
     rate_low_hz: float,
     rate_high_hz: float,
     tolerance_hz: float,
@@ -40,7 +41,7 @@ def calibrate_e_only_input_rate(
     def single_trial_rate(trial_rate_hz: float) -> float:
         inputs = build_pair_inputs(
             n_e=n_e, n_i=0, p=0.0, r_in=0.0, rate_hz=trial_rate_hz,
-            duration_ms=duration_ms, jitter_tau_ms=5.0, rng=rng,
+            duration_ms=duration_ms, jitter_tau_ms=jitter_tau_ms, rng=rng,
         )
         result = simulate_pair(
             e_spikes_a=inputs.e_spikes_a, i_spikes_a=[], e_spikes_b=[], i_spikes_b=[],

@@ -2,6 +2,7 @@
 import numpy as np
 
 from analysis import spike_count_correlation, stationary_correlation
+from block1.chunked import chunk_boundaries
 from block1.dataset import build_pair_inputs
 from block1.model import simulate_pair
 
@@ -24,12 +25,13 @@ def _run_point_chunked(
     second chunk, the same edge-effect argument already used elsewhere in this project).
     """
     v_init_a = v_init_b = 0.0
+    # -1e4ms sentinel matches simulate_pair's own default (far enough in the past that
+    # the first chunk starts not-refractory, identical to an unchunked run).
+    lastspike_init_a = lastspike_init_b = -1e4
     zi_e_a = zi_i_a = zi_e_b = zi_i_b = None
     i_syn_a_chunks, i_syn_b_chunks, spikes_a_chunks, spikes_b_chunks = [], [], [], []
 
-    start_ms = 0.0
-    while start_ms < duration_ms:
-        end_ms = min(start_ms + chunk_duration_ms, duration_ms)
+    for start_ms, end_ms in chunk_boundaries(duration_ms, chunk_duration_ms):
         chunk_ms = end_ms - start_ms
         inputs = build_pair_inputs(
             n_e=n_e, n_i=n_i, p=p, r_in=r_in, rate_hz=rate_hz,
@@ -42,6 +44,7 @@ def _run_point_chunked(
             theta_mV=theta_mV, v_reset_mV=v_reset_mV, t_ref_ms=t_ref_ms,
             duration_ms=chunk_ms, dt_ms=dt_ms,
             v_init_a_mV=v_init_a, v_init_b_mV=v_init_b,
+            lastspike_init_a_ms=lastspike_init_a, lastspike_init_b_ms=lastspike_init_b,
             zi_e_a=zi_e_a, zi_i_a=zi_i_a, zi_e_b=zi_e_b, zi_i_b=zi_i_b,
         )
         i_syn_a_chunks.append(result.i_syn_a_mV)
@@ -49,8 +52,11 @@ def _run_point_chunked(
         spikes_a_chunks.append(result.spikes_a_ms + start_ms)
         spikes_b_chunks.append(result.spikes_b_ms + start_ms)
         v_init_a, v_init_b = result.v_a_final_mV, result.v_b_final_mV
+        # lastspike is local to each chunk's own t=0; re-base it to the next chunk's
+        # t=0 by subtracting this chunk's duration (see model.py's PairResult docstring).
+        lastspike_init_a = result.lastspike_a_final_ms - chunk_ms
+        lastspike_init_b = result.lastspike_b_final_ms - chunk_ms
         zi_e_a, zi_i_a, zi_e_b, zi_i_b = result.zf_e_a, result.zf_i_a, result.zf_e_b, result.zf_i_b
-        start_ms = end_ms
 
     return (
         np.concatenate(i_syn_a_chunks), np.concatenate(i_syn_b_chunks),

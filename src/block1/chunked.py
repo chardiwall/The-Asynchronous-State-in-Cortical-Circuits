@@ -14,6 +14,22 @@ def _spikes_in_window(spikes: list[float], start_ms: float, end_ms: float) -> li
     return [s - start_ms for s in spikes if start_ms <= s < end_ms]
 
 
+def chunk_boundaries(total_duration_ms: float, chunk_duration_ms: float):
+    """(start_ms, end_ms) pairs tiling [0, total_duration_ms) in chunk_duration_ms-sized
+    steps (final chunk shorter if it doesn't divide evenly). The one piece of looping
+    logic genuinely shared between this module's simulate_pair_chunked (chunks a fully
+    pre-generated spike array) and block1.train._run_point_chunked (regenerates inputs
+    per chunk -- can't reuse this module's loop body, since the input source differs,
+    see that function's docstring) -- factored out so at least the boundary arithmetic
+    isn't duplicated.
+    """
+    start_ms = 0.0
+    while start_ms < total_duration_ms:
+        end_ms = min(start_ms + chunk_duration_ms, total_duration_ms)
+        yield start_ms, end_ms
+        start_ms = end_ms
+
+
 def simulate_pair_chunked(
     e_spikes_a: list[float],
     i_spikes_a: list[float],
@@ -35,11 +51,13 @@ def simulate_pair_chunked(
     spikes_a_chunks, spikes_b_chunks = [], []
 
     v_init_a, v_init_b = 0.0, 0.0
+    # -1e4ms sentinel matches simulate_pair's own default: far enough in the past that
+    # the first chunk starts not-refractory, identical to an unchunked run.
+    lastspike_init_a, lastspike_init_b = -1e4, -1e4
     zi_e_a = zi_i_a = zi_e_b = zi_i_b = None
 
-    start_ms = 0.0
-    while start_ms < total_duration_ms:
-        end_ms = min(start_ms + chunk_duration_ms, total_duration_ms)
+    for start_ms, end_ms in chunk_boundaries(total_duration_ms, chunk_duration_ms):
+        chunk_ms = end_ms - start_ms
         result = simulate_pair(
             e_spikes_a=_spikes_in_window(e_spikes_a, start_ms, end_ms),
             i_spikes_a=_spikes_in_window(i_spikes_a, start_ms, end_ms),
@@ -47,8 +65,9 @@ def simulate_pair_chunked(
             i_spikes_b=_spikes_in_window(i_spikes_b, start_ms, end_ms),
             j_e_mV=j_e_mV, j_i_mV=j_i_mV, tau_m_ms=tau_m_ms, tau_s_ms=tau_s_ms,
             theta_mV=theta_mV, v_reset_mV=v_reset_mV, t_ref_ms=t_ref_ms,
-            duration_ms=end_ms - start_ms, dt_ms=dt_ms,
+            duration_ms=chunk_ms, dt_ms=dt_ms,
             v_init_a_mV=v_init_a, v_init_b_mV=v_init_b,
+            lastspike_init_a_ms=lastspike_init_a, lastspike_init_b_ms=lastspike_init_b,
             zi_e_a=zi_e_a, zi_i_a=zi_i_a, zi_e_b=zi_e_b, zi_i_b=zi_i_b,
         )
 
@@ -61,9 +80,12 @@ def simulate_pair_chunked(
         spikes_b_chunks.append(result.spikes_b_ms + start_ms)
 
         v_init_a, v_init_b = result.v_a_final_mV, result.v_b_final_mV
+        # lastspike is local to each chunk's own t=0; re-base it to the next chunk's
+        # t=0 by subtracting this chunk's duration (see model.py's PairResult docstring).
+        lastspike_init_a = result.lastspike_a_final_ms - chunk_ms
+        lastspike_init_b = result.lastspike_b_final_ms - chunk_ms
         zi_e_a, zi_i_a = result.zf_e_a, result.zf_i_a
         zi_e_b, zi_i_b = result.zf_e_b, result.zf_i_b
-        start_ms = end_ms
 
     return PairResult(
         t_ms=np.concatenate(t_chunks),
@@ -74,5 +96,6 @@ def simulate_pair_chunked(
         spikes_a_ms=np.concatenate(spikes_a_chunks),
         spikes_b_ms=np.concatenate(spikes_b_chunks),
         v_a_final_mV=v_init_a, v_b_final_mV=v_init_b,
+        lastspike_a_final_ms=lastspike_init_a, lastspike_b_final_ms=lastspike_init_b,
         zf_e_a=zi_e_a, zf_i_a=zi_i_a, zf_e_b=zi_e_b, zf_i_b=zi_i_b,
     )

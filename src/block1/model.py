@@ -27,20 +27,6 @@ import numpy as np
 from block1.current_trace import bin_edges, synaptic_trace
 
 
-def _advance_one_step(v_last_mV: float, i_last_mV: float, dt_ms: float, tau_m_ms: float) -> float:
-    """Brian2's StateMonitor records V *before* each step's update (when='start'), so
-    v[-1] is the state at duration-dt, not duration -- missing exactly one step's
-    evolution. For chunked runs (block1.chunked) this matters: the next chunk's initial
-    V must be the state at the true chunk boundary. Closed-form exact update for
-    tau_m*dV/dt=-V+I with I held constant over one dt (matching TimedArray's own
-    zero-order hold): V(t+dt) = I + (V(t)-I)*exp(-dt/tau_m) -- the same formula Brian2's
-    own method='exact' integrator uses for this linear ODE, verified to match Brian2's
-    own output bit-for-bit in tests/block1/test_model_chunking.py.
-    """
-    a = np.exp(-dt_ms / tau_m_ms)
-    return float(i_last_mV + (v_last_mV - i_last_mV) * a)
-
-
 @dataclass
 class PairResult:
     t_ms: np.ndarray
@@ -51,10 +37,15 @@ class PairResult:
     spikes_a_ms: np.ndarray
     spikes_b_ms: np.ndarray
     # Carry-forward state for chunked runs (block1.chunked): the final V of each cell,
-    # and the final synaptic_trace filter state (zf) of each of the 4 (cell, population)
-    # traces. Pass these as the next chunk's v_init_*/zi_* to continue seamlessly.
+    # the final synaptic_trace filter state (zf) of each of the 4 (cell, population)
+    # traces, and each cell's lastspike time (local to *this* chunk's t=0) so the next
+    # chunk can reproduce Brian2's own refractory/reset bookkeeping exactly. Pass these
+    # as the next chunk's v_init_*/zi_*/lastspike_init_* (lastspike shifted by this
+    # chunk's duration -- see block1.chunked) to continue seamlessly.
     v_a_final_mV: float
     v_b_final_mV: float
+    lastspike_a_final_ms: float
+    lastspike_b_final_ms: float
     zf_e_a: np.ndarray
     zf_i_a: np.ndarray
     zf_e_b: np.ndarray
@@ -77,6 +68,8 @@ def simulate_pair(
     dt_ms: float,
     v_init_a_mV: float = 0.0,
     v_init_b_mV: float = 0.0,
+    lastspike_init_a_ms: float = -1e4,
+    lastspike_init_b_ms: float = -1e4,
     zi_e_a: np.ndarray | None = None,
     zi_i_a: np.ndarray | None = None,
     zi_e_b: np.ndarray | None = None,
@@ -129,6 +122,18 @@ def simulate_pair(
         2, eqs, threshold="V>theta", reset="V=v_reset", refractory=t_ref, method="exact"
     )
     cells.V = [v_init_a_mV, v_init_b_mV] * b2.mV
+    # lastspike/not_refractory are Brian2's own refractory bookkeeping (auto-added for
+    # any NeuronGroup with a time-based `refractory=`). Seeding them from the previous
+    # chunk's final state -- rather than leaving Brian2's fresh-group defaults (lastspike
+    # far in the past, not_refractory=True) -- is what makes a spike whose refractory
+    # period straddles a chunk boundary carry through correctly: a cell still refractory
+    # at the boundary must ignore synaptic drive for the remaining t_ref in the next
+    # chunk too, exactly as it would have in one unchunked run.
+    cells.lastspike = [lastspike_init_a_ms, lastspike_init_b_ms] * b2.ms
+    cells.not_refractory = [
+        (0.0 - lastspike_init_a_ms) >= t_ref_ms,
+        (0.0 - lastspike_init_b_ms) >= t_ref_ms,
+    ]
 
     state_mon = b2.StateMonitor(cells, "V", record=True)
     spike_mon = b2.SpikeMonitor(cells)
@@ -149,6 +154,16 @@ def simulate_pair(
             f"duration_ms that is an exact multiple of dt_ms."
         )
 
+    # cells.V/cells.lastspike, read directly off the live NeuronGroup after b2.run()
+    # returns, hold the exact post-update state at the true chunk boundary (t=duration_ms)
+    # -- unlike state_mon.V (recorded when='start', so its last sample is at
+    # duration_ms-dt), this needs no analytic patching and is exact including
+    # threshold/reset/refractory, since it's literally what Brian2 computed.
+    v_a_final_mV = float(cells.V[0] / b2.mV)
+    v_b_final_mV = float(cells.V[1] / b2.mV)
+    lastspike_a_final_ms = float(cells.lastspike[0] / b2.ms)
+    lastspike_b_final_ms = float(cells.lastspike[1] / b2.ms)
+
     return PairResult(
         t_ms=t_ms,
         v_a_mV=np.asarray(v[0]),
@@ -157,8 +172,10 @@ def simulate_pair(
         i_syn_b_mV=i_syn_b_mV,
         spikes_a_ms=np.asarray(spike_times_ms[spike_indices == 0]),
         spikes_b_ms=np.asarray(spike_times_ms[spike_indices == 1]),
-        v_a_final_mV=_advance_one_step(v[0][-1], i_syn_a_mV[-1], dt_ms, tau_m_ms),
-        v_b_final_mV=_advance_one_step(v[1][-1], i_syn_b_mV[-1], dt_ms, tau_m_ms),
+        v_a_final_mV=v_a_final_mV,
+        v_b_final_mV=v_b_final_mV,
+        lastspike_a_final_ms=lastspike_a_final_ms,
+        lastspike_b_final_ms=lastspike_b_final_ms,
         zf_e_a=zf_by_name["e_a"],
         zf_i_a=zf_by_name["i_a"],
         zf_e_b=zf_by_name["e_b"],

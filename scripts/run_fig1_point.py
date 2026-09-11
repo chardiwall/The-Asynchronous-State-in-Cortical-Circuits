@@ -9,6 +9,7 @@ Usage: python scripts/run_fig1_point.py <phase> <p_or_r_in>
   phase: fig1b | fig1e_e_only | fig1e_e_plus_i
 """
 import datetime
+import hashlib
 import json
 import sys
 import time
@@ -21,7 +22,17 @@ from block1.calibration import calibrate_synaptic_weights
 from block1.train import run_p_sweep, run_r_in_sweep
 from config import load_config
 
-CHUNK_DURATION_MS = 2_000_000.0  # 2000s per chunk
+
+def _deterministic_seed_offset(phase: str, value: float, modulus: int = 100_000) -> int:
+    """hash((phase, value)) is NOT reproducible across the separate subprocess
+    invocations this script's architecture relies on -- Python randomizes string
+    hashing per-process (PYTHONHASHSEED) unless explicitly disabled, so the same
+    (phase, value) point would get a different, unrepeatable RNG seed each subprocess
+    run. sha256 of a canonical string encoding is stable across processes/runs.
+    """
+    key = f"{phase}:{value!r}".encode()
+    digest = hashlib.sha256(key).hexdigest()
+    return int(digest, 16) % modulus
 
 
 def log(record: dict) -> None:
@@ -44,18 +55,19 @@ def main():
     j_e, j_i = calibrate_synaptic_weights(config)
     # Seed depends on (phase, value) so each point is reproducible and independent of
     # ordering/how many other points ran before it in this or another process.
-    rng = np.random.default_rng(config["seed"] + hash((phase, value)) % 100_000)
+    rng = np.random.default_rng(config["seed"] + _deterministic_seed_offset(phase, value))
 
-    duration_ms = config["pair_model"]["simulation"]["length_s"] * 1000.0
+    sim_cfg = config["pair_model"]["simulation"]
+    duration_ms = sim_cfg["length_s"] * 1000.0
     common = dict(
         j_e_mV=j_e, j_i_mV=j_i,
         tau_m_ms=neuron["tau_m_ms"], tau_s_ms=synapse["tau_s_ms"],
         theta_mV=neuron["v_threshold_mV"], v_reset_mV=neuron["v_reset_mV"],
         t_ref_ms=neuron["t_refractory_ms"],
         jitter_tau_ms=inputs_cfg["mother_train"]["jitter_tau_ms"],
-        duration_ms=duration_ms, dt_ms=config["pair_model"]["simulation"]["dt_ms"],
+        duration_ms=duration_ms, dt_ms=sim_cfg["dt_ms"],
         bin_dt_ms=analysis_cfg["bin_dt_ms"], window_T_ms=analysis_cfg["count_window_T_ms"],
-        chunk_duration_ms=CHUNK_DURATION_MS,
+        chunk_duration_ms=sim_cfg["chunk_duration_s"] * 1000.0,
     )
 
     t0 = time.time()

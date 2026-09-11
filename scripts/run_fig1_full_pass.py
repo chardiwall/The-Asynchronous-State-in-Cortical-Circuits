@@ -27,7 +27,12 @@ def already_done(phase: str, value: float) -> bool:
     try:
         with open("artifacts/metrics.jsonl") as f:
             for line in f:
-                record = json.loads(line)
+                # A process killed (e.g. OOM) mid-write can leave a truncated final
+                # line -- skip it rather than crash the whole orchestrator on resume.
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
                 if record.get("phase") == log_phase and record.get(key) == value:
                     return True
     except FileNotFoundError:
@@ -35,7 +40,8 @@ def already_done(phase: str, value: float) -> bool:
     return False
 
 
-def main():
+def main() -> int:
+    any_failed = False
     for phase, values in PHASE_VALUES.items():
         for value in values:
             if already_done(phase, value):
@@ -48,9 +54,12 @@ def main():
             )
             if result.returncode != 0:
                 print(f"FAILED {phase} {value} (exit code {result.returncode})")
+                any_failed = True
             else:
                 print(f"done {phase} {value}")
 
+    return 1 if any_failed else 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

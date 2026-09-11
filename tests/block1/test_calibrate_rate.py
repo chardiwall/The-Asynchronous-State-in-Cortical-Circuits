@@ -15,7 +15,7 @@ COMMON_KWARGS = dict(
     n_e=250,
     j_e_mV=3.0, j_i_mV=3.0,
     tau_m_ms=10.0, tau_s_ms=5.0, theta_mV=20.0, v_reset_mV=10.0, t_ref_ms=2.0,
-    duration_ms=5000.0, dt_ms=0.05,
+    duration_ms=5000.0, dt_ms=0.05, jitter_tau_ms=5.0,
 )
 
 
@@ -23,7 +23,8 @@ def _measure_output_rate_hz(rate_hz: float, seed: int) -> float:
     rng = np.random.default_rng(seed)
     inputs = build_pair_inputs(
         n_e=COMMON_KWARGS["n_e"], n_i=0, p=0.0, r_in=0.0, rate_hz=rate_hz,
-        duration_ms=COMMON_KWARGS["duration_ms"], jitter_tau_ms=5.0, rng=rng,
+        duration_ms=COMMON_KWARGS["duration_ms"],
+        jitter_tau_ms=COMMON_KWARGS["jitter_tau_ms"], rng=rng,
     )
     result = simulate_pair(
         e_spikes_a=inputs.e_spikes_a, i_spikes_a=[], e_spikes_b=[], i_spikes_b=[],

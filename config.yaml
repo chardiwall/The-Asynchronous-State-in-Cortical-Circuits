@@ -54,6 +54,9 @@ pair_model:
   simulation:
     dt_ms: 0.05
     length_s: 10000.0
+    chunk_duration_s: 2000.0  # scripts/run_fig1_point.py: bounded per-chunk window for the
+      # paper-accurate full pass (both input generation and simulation are chunked at this
+      # scale -- see PROGRESS.md's "Paper-accurate full pass" section for why)
   calibration_check:            # single-spike PSP verification harness (Phase 1 self-check),
     dt_ms: 0.01                 # distinct from the production sweep's dt/length above --
     duration_ms: 50.0           # this only needs to resolve one ~7ms-peaked PSP cleanly

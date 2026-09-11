@@ -73,7 +73,8 @@ This block builds the core intuition the rest of the paper depends on: does shar
 | `current_trace.py` | 3 | Precomputed synaptic current traces (ADR 0002), replacing per-event Brian2 objects — needed at the paper's real input volume |
 | `dataset.py` | 3 | Input generation — literal sharing (`p`) + mother-train correlation (`r_in`) |
 | `calibrate_rate.py` | 6 | Numerically calibrates the E-only input rate (an ambiguity the paper leaves unstated) |
-| `train.py` | 5–6 | Sweep runners (`run_p_sweep`, `run_r_in_sweep`) |
+| `chunked.py` | full pass | `simulate_pair_chunked` — chunks an already-generated spike train over bounded windows (narrower case than `train.py`'s per-chunk regeneration below); also holds `chunk_boundaries`, the chunk-splitting arithmetic shared with `train.py` |
+| `train.py` | 5–6, full pass | Sweep runners (`run_p_sweep`, `run_r_in_sweep`); `chunk_duration_ms` regenerates inputs *and* simulates per bounded chunk (needed at the paper's real `L=10,000s` scale — see `PROGRESS.md`) |
 | `eval.py` | 5–6 | Qualitative trend checks against the paper's stated results |
 | `traces.py` | 7 | Illustrative example-trace plots (Fig. 1C/1F) |
 
