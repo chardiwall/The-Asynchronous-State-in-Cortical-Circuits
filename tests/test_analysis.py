@@ -9,7 +9,12 @@ import json
 import numpy as np
 import pytest
 
-from analysis import spike_count_correlation, stationary_correlation, windowed_rate
+from analysis import (
+    StreamingCorrelation,
+    spike_count_correlation,
+    stationary_correlation,
+    windowed_rate,
+)
 from block1.calibration import calibrate_synaptic_weights
 from block1.dataset import build_pair_inputs
 from block1.model import simulate_pair
@@ -40,6 +45,32 @@ def test_orthogonal_signals_give_r_zero():
     x = np.array([1.0, -1.0, 1.0, -1.0])
     y = np.array([1.0, 1.0, -1.0, -1.0])
     assert stationary_correlation(x, y) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_streaming_correlation_matches_stationary_correlation_on_one_chunk():
+    rng = np.random.default_rng(5)
+    x = rng.normal(size=1000)
+    y = 0.7 * x + rng.normal(scale=0.5, size=1000)
+
+    acc = StreamingCorrelation()
+    acc.update(x, y)
+    assert acc.correlation() == pytest.approx(stationary_correlation(x, y), abs=1e-9)
+
+
+def test_streaming_correlation_matches_when_split_into_chunks():
+    # The point of StreamingCorrelation: chunking the input must not change the result
+    # (block1.full_pass streams chunks instead of holding the full L=10,000s array).
+    rng = np.random.default_rng(6)
+    x = rng.normal(loc=3.0, scale=2.0, size=10_000)
+    y = -0.4 * x + rng.normal(scale=1.5, size=10_000)
+    expected = stationary_correlation(x, y)
+
+    acc = StreamingCorrelation()
+    chunk_size = 777  # deliberately doesn't divide 10,000 evenly
+    for start in range(0, len(x), chunk_size):
+        acc.update(x[start:start + chunk_size], y[start:start + chunk_size])
+
+    assert acc.correlation() == pytest.approx(expected, abs=1e-9)
 
 
 def test_windowed_rate_matches_hand_computed_sliding_sum():

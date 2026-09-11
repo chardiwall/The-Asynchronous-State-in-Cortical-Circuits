@@ -66,17 +66,25 @@ This block builds the core intuition the rest of the paper depends on: does shar
 
 ## Module map
 
-| File | Phase | Role |
-|---|---|---|
-| `calibration.py` | 1 | Closed-form + Brian2-verified synaptic weight calibration (`J_E`, `J_I`) |
-| `model.py` | 2 | The two-neuron pair model itself (`simulate_pair`) |
-| `current_trace.py` | 3 | Precomputed synaptic current traces (ADR 0002), replacing per-event Brian2 objects — needed at the paper's real input volume |
-| `dataset.py` | 3 | Input generation — literal sharing (`p`) + mother-train correlation (`r_in`) |
-| `calibrate_rate.py` | 6 | Numerically calibrates the E-only input rate (an ambiguity the paper leaves unstated) |
-| `chunked.py` | full pass | `simulate_pair_chunked` — chunks an already-generated spike train over bounded windows (narrower case than `train.py`'s per-chunk regeneration below); also holds `chunk_boundaries`, the chunk-splitting arithmetic shared with `train.py` |
-| `train.py` | 5–6, full pass | Sweep runners (`run_p_sweep`, `run_r_in_sweep`); `chunk_duration_ms` regenerates inputs *and* simulates per bounded chunk (needed at the paper's real `L=10,000s` scale — see `PROGRESS.md`) |
-| `eval.py` | 5–6 | Qualitative trend checks against the paper's stated results |
-| `traces.py` | 7 | Illustrative example-trace plots (Fig. 1C/1F) |
+One main script (`full_pass.py`) plus focused helpers, all living in this directory —
+no separate top-level `scripts/`.
+
+| File | Role |
+|---|---|
+| `calibration.py` | Closed-form + Brian2-verified synaptic weight calibration (`J_E`, `J_I`) |
+| `model.py` | The two-neuron pair model (`simulate_pair`) — the tested foundation every other module builds on; also used directly for small one-off runs (calibration, illustrative traces) |
+| `current_trace.py` | Precomputed synaptic current traces (ADR 0002), replacing per-event Brian2 objects — needed at the paper's real input volume |
+| `dataset.py` | Input generation — literal sharing (`p`) + mother-train correlation (`r_in`) |
+| `calibrate_rate.py` | Numerically calibrates the E-only input rate (an ambiguity the paper leaves unstated) |
+| `batched_model.py` | `simulate_pairs_batch` — N independent pairs (e.g. all 15 sweep points) in ONE Brian2 `NeuronGroup(2N)` instead of N separate runs; exact, not an approximation, since the points don't couple (see module docstring). This is what makes the production sweep GPU-friendly. |
+| `full_pass.py` | **Main script.** Builds the Fig. 1B/1E sweep grid, runs it via `batched_model` (chunked over time), writes a structured CSV. `python -m block1.full_pass` |
+| `eval.py` | Qualitative trend checks against the paper's stated results |
+| `plot_fig1.py` | All four Fig. 1 plots: 1B/1E from `full_pass`'s CSV (combined panels, `c` dashed / `r_out` `-o-`), 1C/1F bespoke illustrative traces (raster / current / V, scale bars) |
+
+`eval.py`'s trend checks and small-scale correctness sweeps that predate the batched
+production path are exercised through `model.simulate_pair` directly in the test suite
+(`tests/block1/test_model.py`, `test_model_chunking.py`, `test_integration.py`) rather
+than through a separate sweep-runner module.
 
 ## Status
 

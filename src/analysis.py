@@ -1,6 +1,8 @@
 """The shared measurement pipeline (07-analysis-methods.md), used identically by
 blocks 1, 3 and 4 -- built once, held fixed, reused at every level L1-L4.
 """
+from dataclasses import dataclass, field
+
 import numpy as np
 
 
@@ -10,6 +12,43 @@ def stationary_correlation(x: np.ndarray, y: np.ndarray) -> float:
     (library-first: numpy.corrcoef).
     """
     return float(np.corrcoef(x, y)[0, 1])
+
+
+@dataclass
+class StreamingCorrelation:
+    """The same Pearson correlation stationary_correlation computes, accumulated over a
+    sequence of chunks instead of one array held in memory at once -- for a series too
+    long to hold in full (e.g. block1.full_pass's L=10,000s current traces, chunked over
+    time). Mathematically exact, not an approximation: Cov/Var are themselves just sums,
+    so summing per-chunk partial sums and combining once at the end gives the identical
+    result stationary_correlation(full concatenated x, y) would (verified in
+    tests/test_analysis.py against stationary_correlation on both an unchunked array and
+    a chunked-vs-unchunked comparison).
+    """
+    n: int = 0
+    sum_x: float = 0.0
+    sum_y: float = 0.0
+    sum_x2: float = 0.0
+    sum_y2: float = 0.0
+    sum_xy: float = field(default=0.0)
+
+    def update(self, x: np.ndarray, y: np.ndarray) -> None:
+        x = np.asarray(x, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64)
+        self.n += len(x)
+        self.sum_x += float(x.sum())
+        self.sum_y += float(y.sum())
+        self.sum_x2 += float((x * x).sum())
+        self.sum_y2 += float((y * y).sum())
+        self.sum_xy += float((x * y).sum())
+
+    def correlation(self) -> float:
+        mean_x = self.sum_x / self.n
+        mean_y = self.sum_y / self.n
+        cov_xy = self.sum_xy / self.n - mean_x * mean_y
+        var_x = self.sum_x2 / self.n - mean_x * mean_x
+        var_y = self.sum_y2 / self.n - mean_y * mean_y
+        return float(cov_xy / np.sqrt(var_x * var_y))
 
 
 def windowed_rate(
