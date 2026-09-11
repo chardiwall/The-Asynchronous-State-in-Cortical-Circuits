@@ -50,18 +50,32 @@ def test_c_is_higher_at_p_one_than_p_zero():
     assert c_at_p1 > c_at_p0
 
 
-def test_chunked_sweep_matches_unchunked_sweep():
-    # chunk_duration_ms=None (default) uses simulate_pair directly, unchunked -- the
-    # scale every other test in this file runs at. Passing it uses simulate_pair_chunked
-    # (ADR 0002's deferred piece, needed for Fig. 1's real L=10,000s scale). Same seed
-    # must give identical results either way -- chunking is an internal-only change.
-    unchunked = run_p_sweep(p_values=[0.2], rng=np.random.default_rng(7), **COMMON_KWARGS)
+def test_chunked_sweep_is_nan_free_and_has_expected_keys():
+    # chunk_duration_ms=None (default) generates inputs and simulates for the whole
+    # duration in one shot -- the scale every other test in this file runs at. Passing
+    # it regenerates inputs AND simulates per bounded chunk instead (needed at Fig. 1's
+    # real L=10,000s scale -- both input generation and the Brian2 side must be
+    # chunked, confirmed by a real OOM kill when only the latter was). NOT expected to
+    # be bit-identical to the unchunked path even with the same seed (each chunk
+    # consumes the rng stream differently) -- regenerating inputs per chunk is
+    # statistically exact (Poisson processes have independent increments), just not a
+    # deterministic replay, so this checks structure/validity, not exact equality.
     chunked = run_p_sweep(
         p_values=[0.2], rng=np.random.default_rng(7), chunk_duration_ms=500.0,
         **COMMON_KWARGS,
     )
-    assert chunked[0]["c"] == pytest.approx(unchunked[0]["c"], abs=1e-9)
-    assert chunked[0]["r_out"] == pytest.approx(unchunked[0]["r_out"], abs=1e-9)
+    assert not np.isnan(chunked[0]["c"])
+    assert not np.isnan(chunked[0]["r_out"])
+
+
+def test_chunked_p_one_still_gives_c_exactly_one():
+    # p=1.0 (fully shared) must still give c=1.0 exactly regardless of how many chunks
+    # the run is split into -- literal sharing isn't sensitive to chunk boundaries.
+    chunked = run_p_sweep(
+        p_values=[1.0], rng=np.random.default_rng(8), chunk_duration_ms=500.0,
+        **COMMON_KWARGS,
+    )
+    assert chunked[0]["c"] == pytest.approx(1.0, abs=1e-9)
 
 
 def test_r_in_sweep_returns_one_result_per_r_in_value():
