@@ -71,7 +71,6 @@ pair_model:
 # Provenance: SOM S-p.18-19. See docs/paper/02-binary-network.md
 # ---------------------------------------------------------------------------
 binary_network:
-  n_per_population: 4096       # N_E = N_I = N_X = N; total 3N units
   connection_probability: 0.2  # p_ab, all population pairs
   m_x: 0.1                     # external population mean activity
   theta: 1.0                   # firing threshold, all cells
@@ -83,10 +82,25 @@ binary_network:
     j_EX: 5.0
     j_IX: 4.0
   tau_ms: 10.0                 # tau_E = tau_I = tau_X; dt = tau / (3N)
-  sampling_rate_per_tau: 1     # SR: 1 instantaneous, 16 for lagged/CCG
+  sampling_rate_instantaneous: 1   # SR for r/c (Fig. 2C, 2G): 1 sample per tau
+  sampling_rate_lagged: 16         # SR for CCGs (Fig. 2E): 16 samples per tau
+  sizes_fixed: [1024, 8192]    # required exactly, not swept: Fig. 2D uses both; 2E/2G use 8192
+  sizes_sweep_full_pass: null  # Fig. 2C's N=100..10,000 grid -- deliberately not set yet
+    # (session 2026-09-11 grilling Q13): needs a throughput benchmark from the exploratory
+    # pass first, so the grid/repeat-count are chosen against measured cost, not guessed.
+    # See PROGRESS.md and docs/adr/0003.
+  fig2g_subsample_neurons: 1000  # random E-neuron subset at N=8192 for the r histogram (~500k pairs)
+  ccg:
+    max_lag_ms: 50.0            # Fig. 2E; bin = tau_ms / sampling_rate_lagged (native, no downsampling)
+  burn_in_tau: 10               # discarded before recording (session 2026-09-11: random
+    # Bernoulli(0.5) initial state per neuron, then burn_in_tau*3N ticks discarded)
+  exploratory:                  # session 2026-09-11 grilling Q11: fast validation pass,
+    sizes: [100, 200, 400]      # not reproduction numbers -- checked against S-Eq(18,28-33)
+    n_realisations: 5           # closed-form predictions, and used for the Q13 throughput benchmark
+    length_tau: 5000
   simulation:
     length_tau: 200000
-    n_realisations: 50         # Fig. 2C; 10 for Fig. 2F
+    n_realisations: 50         # Fig. 2C (pending Q13); 10 for Fig. 2F
   robustness:                  # Fig. S4 sweep
     lambda_E: [1.0, 2.0]       # scales j_EE and j_IE together
     tau_I: [1.0, 2.0]          # relative to tau_E = 1
