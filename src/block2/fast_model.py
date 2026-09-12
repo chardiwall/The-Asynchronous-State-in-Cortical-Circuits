@@ -75,6 +75,38 @@ def _run_jit(
     return activity
 
 
+@njit
+def _run_jit_current(
+    weights_E: np.ndarray, weights_I: np.ndarray, initial_state: np.ndarray,
+    theta: float, m_x: float, burn_in_ticks: int, n_samples: int, ticks_per_sample: int,
+    subsample_E: np.ndarray, subsample_I: np.ndarray, seed: int,
+) -> np.ndarray:
+    """Same tick sequence as _run_jit, but records TOTAL current h_i (S-Eq 7, via
+    the same _afferent_current_jit) for a subsample of E/I neurons at each sample,
+    instead of binary state -- what Fig. 2C's c_EE/c_II/c_EI need. Subsampling
+    (not all N neurons) keeps this affordable at N=8192: current is a continuous
+    float, not the 0/1 state uint8 can hold.
+    """
+    n = weights_E.shape[0]
+    state = initial_state.copy()
+    np.random.seed(seed)
+
+    for _ in range(burn_in_ticks):
+        _tick_jit(state, weights_E, weights_I, theta, m_x, n)
+
+    n_subsample = len(subsample_E) + len(subsample_I)
+    current = np.zeros((n_subsample, n_samples), dtype=np.float32)
+    for sample_idx in range(n_samples):
+        for _ in range(ticks_per_sample):
+            _tick_jit(state, weights_E, weights_I, theta, m_x, n)
+        for k, i in enumerate(subsample_E):
+            current[k, sample_idx] = _afferent_current_jit(state, weights_E[i], theta)
+        offset = len(subsample_E)
+        for k, i in enumerate(subsample_I):
+            current[offset + k, sample_idx] = _afferent_current_jit(state, weights_I[i], theta)
+    return current
+
+
 def simulate_fast(
     n: int, p: float, j: dict[str, float], m_x: float, theta: float,
     length_tau: int, sampling_rate: int, n_realisations: int, burn_in_tau: int, seed: int,
@@ -99,3 +131,26 @@ def simulate_fast(
         activity["X"][r] = result[2 * n:]
 
     return SimulationResult(activity=activity)
+
+
+def simulate_fast_current(
+    n: int, p: float, j: dict[str, float], m_x: float, theta: float,
+    length_tau: int, sampling_rate: int, burn_in_tau: int, seed: int, subsample_size: int,
+) -> dict[str, np.ndarray]:
+    n_samples = length_tau * sampling_rate
+    ticks_per_tau = 3 * n
+    ticks_per_sample = ticks_per_tau // sampling_rate
+    burn_in_ticks = burn_in_tau * ticks_per_tau
+
+    rng = np.random.default_rng(seed)
+    weights = build_weights(n=n, p=p, j=j, rng=rng)
+    weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
+    weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
+    initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
+    subsample_E = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
+    subsample_I = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
+
+    current = _run_jit_current(weights_E, weights_I, initial_state, theta, m_x,
+                                burn_in_ticks, n_samples, ticks_per_sample,
+                                subsample_E, subsample_I, seed)
+    return {"E": current[:len(subsample_E)], "I": current[len(subsample_E):]}
