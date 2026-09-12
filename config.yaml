@@ -85,10 +85,16 @@ binary_network:
   sampling_rate_instantaneous: 1   # SR for r/c (Fig. 2C, 2G): 1 sample per tau
   sampling_rate_lagged: 16         # SR for CCGs (Fig. 2E): 16 samples per tau
   sizes_fixed: [1024, 8192]    # required exactly, not swept: Fig. 2D uses both; 2E/2G use 8192
-  sizes_sweep_full_pass: null  # Fig. 2C's N=100..10,000 grid -- deliberately not set yet
-    # (session 2026-09-11 grilling Q13): needs a throughput benchmark from the exploratory
-    # pass first, so the grid/repeat-count are chosen against measured cost, not guessed.
-    # See PROGRESS.md and docs/adr/0003.
+  full_pass:                   # Fig. 2C's N-grid + per-size repeat count (session
+    # 2026-09-11/12): decided against the JIT+manual-loop throughput benchmark
+    # (N=1024: 612,850 ticks/s; N=8192: 83,433 ticks/s -- close to O(N^2) per-realisation
+    # cost), targeting <24h wall-clock on spark-c3d8's 20 Slurm cores. Repeats taper at
+    # the top of the range since cost is dominated there; paper's 50 kept everywhere it's
+    # cheap. Runs as independent single-process Slurm array tasks (block2.full_pass),
+    # not Python multiprocessing -- see docs/adr/0003's ARM64 ProcessPoolExecutor note.
+    sizes:   [100, 178, 316, 562, 1000, 1780, 3160, 5620, 8192]
+    repeats: [50,  50,  50,  50,  50,   50,   25,   12,   10]
+    length_tau: 200000
   fig2g_subsample_neurons: 1000  # random E-neuron subset at N=8192 for the r histogram (~500k pairs)
   ccg:
     max_lag_ms: 50.0            # Fig. 2E; bin = tau_ms / sampling_rate_lagged (native, no downsampling)
