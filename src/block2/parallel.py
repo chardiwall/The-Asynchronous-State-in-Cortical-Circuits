@@ -2,7 +2,16 @@
 cores). Realisations are mutually independent -- own seed (seed+r), own connectivity
 draw -- so this is pure orchestration: no new correctness surface beyond confirming
 per-realisation output is identical whether run sequentially or in parallel.
+
+Uses the 'spawn' multiprocessing start method, not the Linux default 'fork': forking
+a process that has already triggered Numba/LLVM JIT compilation (as this module's own
+callers typically have, e.g. running simulate_fast first) can hand child processes
+partially-initialized LLVM state and crash them (BrokenProcessPool, no OOM signature
+-- observed on the DGX during this session). 'spawn' gives each worker a fresh
+interpreter at the cost of slightly slower startup, which is negligible next to a
+full-pass run's actual duration.
 """
+import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
@@ -39,7 +48,7 @@ def simulate_fast_parallel(
     n_samples = length_tau * sampling_rate
     activity = {pop: np.zeros((n_realisations, n, n_samples)) for pop in ("E", "I", "X")}
 
-    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+    with ProcessPoolExecutor(max_workers=max_workers, mp_context=multiprocessing.get_context("spawn")) as pool:
         futures = [
             pool.submit(_run_one_realisation, n, p, j, m_x, theta,
                         length_tau, sampling_rate, burn_in_tau, seed + r)
