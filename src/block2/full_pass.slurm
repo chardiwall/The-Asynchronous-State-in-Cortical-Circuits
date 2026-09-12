@@ -9,6 +9,7 @@
 #SBATCH --array=0-346%20
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
+#SBATCH --mem=10G
 #SBATCH --time=20:00:00
 #SBATCH --output=artifacts/block2_full_pass/slurm_%a.out
 

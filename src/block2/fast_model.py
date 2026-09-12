@@ -16,6 +16,14 @@ shared on-disk cache file, which crashed worker processes on the DGX
 (BrokenProcessPool, no OOM/error signature -- reproduced with 20 workers, not 2).
 Each process now compiles in-memory instead (a ~1-2s one-time cost per process,
 negligible against a real run's duration).
+
+Recorded activity is stored as uint8, not float64: state values are strictly
+Heaviside-thresholded 0/1 (S-Eq 5-7), so this is lossless, and it matters at
+scale -- at N=8192, length_tau=200,000 the float64 array would be ~39GB for a
+single realisation (an 8x-oversized allocation that silently blocked real
+concurrency on the DGX's Slurm nodes: each task's implicit memory footprint
+left room for only 2-3 concurrent N=8192 tasks per 118GB node, found while
+testing block2.full_pass there). uint8 brings that to ~4.9GB.
 """
 import numpy as np
 from numba import njit
@@ -59,11 +67,11 @@ def _run_jit(
     for _ in range(burn_in_ticks):
         _tick_jit(state, weights_E, weights_I, theta, m_x, n)
 
-    activity = np.zeros((3 * n, n_samples))
+    activity = np.zeros((3 * n, n_samples), dtype=np.uint8)
     for sample_idx in range(n_samples):
         for _ in range(ticks_per_sample):
             _tick_jit(state, weights_E, weights_I, theta, m_x, n)
-        activity[:, sample_idx] = state
+        activity[:, sample_idx] = state.astype(np.uint8)
     return activity
 
 
@@ -76,7 +84,7 @@ def simulate_fast(
     ticks_per_sample = ticks_per_tau // sampling_rate
     burn_in_ticks = burn_in_tau * ticks_per_tau
 
-    activity = {pop: np.zeros((n_realisations, n, n_samples)) for pop in ("E", "I", "X")}
+    activity = {pop: np.zeros((n_realisations, n, n_samples), dtype=np.uint8) for pop in ("E", "I", "X")}
     for r in range(n_realisations):
         rng = np.random.default_rng(seed + r)
         weights = build_weights(n=n, p=p, j=j, rng=rng)
