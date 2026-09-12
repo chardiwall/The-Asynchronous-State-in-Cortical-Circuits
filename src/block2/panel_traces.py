@@ -6,6 +6,7 @@ primitives; only what gets recorded at each sample differs.
 import numpy as np
 from numba import njit
 
+from block2.connectivity import build_weights
 from block2.fast_model import _tick_jit
 
 
@@ -90,3 +91,37 @@ def _run_jit_cell_components(
         components[2, sample_idx] = x_component
         components[3, sample_idx] = e_component + i_component + x_component - theta
     return components
+
+
+def _build_run_inputs(n: int, p: float, j: dict[str, float], seed: int):
+    rng = np.random.default_rng(seed)
+    weights = build_weights(n=n, p=p, j=j, rng=rng)
+    weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
+    weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
+    initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
+    return weights_E, weights_I, initial_state, rng
+
+
+def population_mean_trace(n, p, j, m_x, theta, window_tau, sampling_rate, burn_in_tau, seed):
+    weights_E, weights_I, initial_state, _ = _build_run_inputs(n, p, j, seed)
+    ticks_per_tau = 3 * n
+    return _run_jit_population_mean(
+        weights_E, weights_I, initial_state, theta, m_x, burn_in_tau * ticks_per_tau,
+        window_tau * sampling_rate, ticks_per_tau // sampling_rate, seed)
+
+
+def subsample_state_trace(n, p, j, m_x, theta, window_tau, sampling_rate, burn_in_tau, seed, subsample_size):
+    weights_E, weights_I, initial_state, rng = _build_run_inputs(n, p, j, seed)
+    ticks_per_tau = 3 * n
+    subsample_E = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
+    return _run_jit_subsample_state(
+        weights_E, weights_I, initial_state, theta, m_x, burn_in_tau * ticks_per_tau,
+        window_tau * sampling_rate, ticks_per_tau // sampling_rate, subsample_E, seed)
+
+
+def single_cell_components_trace(n, p, j, m_x, theta, window_tau, sampling_rate, burn_in_tau, seed, cell_index):
+    weights_E, weights_I, initial_state, _ = _build_run_inputs(n, p, j, seed)
+    ticks_per_tau = 3 * n
+    return _run_jit_cell_components(
+        weights_E, weights_I, initial_state, theta, m_x, burn_in_tau * ticks_per_tau,
+        window_tau * sampling_rate, ticks_per_tau // sampling_rate, cell_index, seed)

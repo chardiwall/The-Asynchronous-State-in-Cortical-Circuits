@@ -19,3 +19,21 @@ def population_averaged_correlation(
     if exclude_matching_index:
         cross = cross[~np.eye(n_a, dtype=bool)]
     return float(cross.mean())
+
+
+def population_averaged_ccg(
+    samples_a: np.ndarray, samples_b: np.ndarray, max_lag: int, exclude_matching_index: bool,
+) -> np.ndarray:
+    """Fig. 2E: population_averaged_correlation applied at each lag from -max_lag
+    to +max_lag (samples), not new correlation math. CCG(lag) correlates a(t)
+    with b(t+lag), matching S-Eq(42)'s s_i(t)s_j(t+tau) convention.
+    """
+    n_samples = samples_a.shape[1]
+    ccg = np.zeros(2 * max_lag + 1)
+    for k, lag in enumerate(range(-max_lag, max_lag + 1)):
+        if lag >= 0:
+            a_slice, b_slice = samples_a[:, :n_samples - lag], samples_b[:, lag:]
+        else:
+            a_slice, b_slice = samples_a[:, -lag:], samples_b[:, :n_samples + lag]
+        ccg[k] = population_averaged_correlation(a_slice, b_slice, exclude_matching_index)
+    return ccg

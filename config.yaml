@@ -110,6 +110,13 @@ binary_network:
   robustness:                  # Fig. S4 sweep
     lambda_E: [1.0, 2.0]       # scales j_EE and j_IE together
     tau_I: [1.0, 2.0]          # relative to tau_E = 1
+  illustrative_panels:          # single-realisation runs for 2B/2D/2E/2G -- deliberately
+    # short (not the full 200,000 tau) since these show qualitative shape, not ensemble
+    # precision (2C's job already covers that); cheap enough to run locally, no DGX needed.
+    panel_b_window_tau: 100      # ~1s at SR=16, one E-cell's current components
+    panel_d_window_tau: 200      # ~2s at SR=16, population-mean activity (both fixed sizes)
+    panel_e_window_tau: 2000     # SR=16 current-component CCGs
+    panel_g_window_tau: 20000    # SR=1, 1000-neuron subsample for the r histogram
 
 # ---------------------------------------------------------------------------
 # Block 3 — recurrent conductance-based spiking network (Fig. 3)  [MAIN FOCUS]
