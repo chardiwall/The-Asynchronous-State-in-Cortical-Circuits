@@ -9,6 +9,13 @@ restructured: one concatenated (3n,) state vector (E,I,X in order) and two
 stacked (n,3n) weight matrices, weights_E=[EE|EI|EX], weights_I=[IE|II|IX].
 Cross-checked against model.py/simulate.py statistically (not bit-for-bit --
 Numba's RNG and numpy's Generator are different algorithms), not exactly.
+
+No cache=True on these @njit functions: many worker processes (block2.parallel)
+compiling the same function for the first time simultaneously race on Numba's
+shared on-disk cache file, which crashed worker processes on the DGX
+(BrokenProcessPool, no OOM/error signature -- reproduced with 20 workers, not 2).
+Each process now compiles in-memory instead (a ~1-2s one-time cost per process,
+negligible against a real run's duration).
 """
 import numpy as np
 from numba import njit
@@ -17,7 +24,7 @@ from block2.connectivity import build_weights
 from block2.simulate import SimulationResult
 
 
-@njit(cache=True)
+@njit
 def _afferent_current_jit(state: np.ndarray, weights_row: np.ndarray, theta: float) -> float:
     # Manual loop, not np.dot: ~1.5x faster measured at N=8192 scale inside nopython
     # mode (np.dot doesn't hit an optimized BLAS path here the way numpy's does).
@@ -27,7 +34,7 @@ def _afferent_current_jit(state: np.ndarray, weights_row: np.ndarray, theta: flo
     return total - theta
 
 
-@njit(cache=True)
+@njit
 def _tick_jit(state: np.ndarray, weights_E: np.ndarray, weights_I: np.ndarray, theta: float, m_x: float, n: int) -> None:
     idx = np.random.randint(0, 3 * n)
     if idx < n:
@@ -40,7 +47,7 @@ def _tick_jit(state: np.ndarray, weights_E: np.ndarray, weights_I: np.ndarray, t
         state[2 * n + i] = 1.0 if np.random.random() < m_x else 0.0
 
 
-@njit(cache=True)
+@njit
 def _run_jit(
     weights_E: np.ndarray, weights_I: np.ndarray, initial_state: np.ndarray,
     theta: float, m_x: float, burn_in_ticks: int, n_samples: int, ticks_per_sample: int, seed: int,
