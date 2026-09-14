@@ -157,11 +157,22 @@ spiking_network:
   external_input:
     kind: poisson
     rate_hz: 2.5
+  burn_in_ms: 100.0             # discarded before recording -- paper doesn't state one
+    # (docs/paper/03 Ambiguity); ~7x tau_m=15ms, long enough for the initial transient
+    # to settle. Revisit with real numbers before the Fig. 3A-B full pass.
   simulation:
     integrator: rk2            # second-order Runge-Kutta
     dt_ms: 0.05
     length_s: 200.0            # 5000 s for the Fig. S6 characterisation run
     n_networks: 10
+  exploratory:                 # session 2026-09-14 grilling Q1: smoke-test pass, full
+    # paper-scale N (unlike block 2 -- g^ab are fixed nS, not 1/sqrt(N)-scaled, so
+    # shrinking N would starve every neuron of input and land in a different regime).
+    # Only length_s is shortened relative to `simulation` above; everything else is
+    # identical, so this run is a true subset of the eventual full pass.
+    length_s: 5.0
+    n_networks: 1
+    brian2_device: runtime      # standalone deferred until a measured need (ADR 0001/0003 pattern)
   expected:                    # reproduction targets, not inputs
     rate_excitatory_hz: 1.0
     rate_inhibitory_hz: 3.6
