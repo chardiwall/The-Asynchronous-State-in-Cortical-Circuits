@@ -13,7 +13,7 @@ import json
 import sys
 
 from block2.eval import population_averaged_correlation
-from block2.fast_model import simulate_fast
+from block2.fast_model import simulate_fast_one
 from config import load_config
 
 RESULTS_DIR = "artifacts/block2_full_pass"
@@ -27,17 +27,17 @@ def run_one_task(
     n: int, realisation: int, p: float, j: dict[str, float], m_x: float, theta: float,
     length_tau: int, sampling_rate: int, burn_in_tau: int, seed: int,
 ) -> dict:
-    result = simulate_fast(n=n, p=p, j=j, m_x=m_x, theta=theta, length_tau=length_tau,
-                            sampling_rate=sampling_rate, n_realisations=1,
-                            burn_in_tau=burn_in_tau, seed=seed + realisation)
-    activity = result.activity
+    result = simulate_fast_one(n=n, p=p, j=j, m_x=m_x, theta=theta, length_tau=length_tau,
+                                sampling_rate=sampling_rate, burn_in_tau=burn_in_tau,
+                                seed=seed + realisation)
+    e, i, x = result[:n], result[n:2 * n], result[2 * n:]  # views, not copies
     row = {"n": n, "realisation": realisation}
-    row.update({f"rate_{pop}": float(activity[pop].mean()) for pop in ("E", "I", "X")})
-    row["r_EE"] = population_averaged_correlation(activity["E"][0], activity["E"][0], True)
-    row["r_II"] = population_averaged_correlation(activity["I"][0], activity["I"][0], True)
-    row["r_EI"] = population_averaged_correlation(activity["E"][0], activity["I"][0], False)
-    row["r_EX"] = population_averaged_correlation(activity["E"][0], activity["X"][0], False)
-    row["r_IX"] = population_averaged_correlation(activity["I"][0], activity["X"][0], False)
+    row["rate_E"], row["rate_I"], row["rate_X"] = float(e.mean()), float(i.mean()), float(x.mean())
+    row["r_EE"] = population_averaged_correlation(e, e, True)
+    row["r_II"] = population_averaged_correlation(i, i, True)
+    row["r_EI"] = population_averaged_correlation(e, i, False)
+    row["r_EX"] = population_averaged_correlation(e, x, False)
+    row["r_IX"] = population_averaged_correlation(i, x, False)
     return row
 
 

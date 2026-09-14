@@ -98,6 +98,7 @@ def _build_run_inputs(n: int, p: float, j: dict[str, float], seed: int):
     weights = build_weights(n=n, p=p, j=j, rng=rng)
     weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
     weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
+    del weights  # the 6 (n,n) blocks are now redundant with weights_E/weights_I
     initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
     return weights_E, weights_I, initial_state, rng
 

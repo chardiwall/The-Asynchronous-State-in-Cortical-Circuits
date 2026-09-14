@@ -107,6 +107,33 @@ def _run_jit_current(
     return current
 
 
+def simulate_fast_one(
+    n: int, p: float, j: dict[str, float], m_x: float, theta: float,
+    length_tau: int, sampling_rate: int, burn_in_tau: int, seed: int,
+) -> np.ndarray:
+    """Single realisation, returns the raw (3n, n_samples) uint8 result directly --
+    not simulate_fast's dict-of-realisations shape (needed when several
+    realisations must be retained together). A caller needing just one
+    realisation's summary stats can slice views straight off this array instead
+    of paying for a second full copy into a separate activity dict -- found
+    costing full_pass.py real memory (OOM at N=8192, see docs/adr/0003).
+    """
+    n_samples = length_tau * sampling_rate
+    ticks_per_tau = 3 * n
+    ticks_per_sample = ticks_per_tau // sampling_rate
+    burn_in_ticks = burn_in_tau * ticks_per_tau
+
+    rng = np.random.default_rng(seed)
+    weights = build_weights(n=n, p=p, j=j, rng=rng)
+    weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
+    weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
+    del weights
+    initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
+
+    return _run_jit(weights_E, weights_I, initial_state, theta, m_x,
+                     burn_in_ticks, n_samples, ticks_per_sample, seed)
+
+
 def simulate_fast(
     n: int, p: float, j: dict[str, float], m_x: float, theta: float,
     length_tau: int, sampling_rate: int, n_realisations: int, burn_in_tau: int, seed: int,
@@ -122,6 +149,7 @@ def simulate_fast(
         weights = build_weights(n=n, p=p, j=j, rng=rng)
         weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
         weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
+        del weights  # the 6 (n,n) blocks are now redundant with weights_E/weights_I
         initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
 
         result = _run_jit(weights_E, weights_I, initial_state, theta, m_x,
@@ -146,6 +174,7 @@ def simulate_fast_current(
     weights = build_weights(n=n, p=p, j=j, rng=rng)
     weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
     weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
+    del weights  # the 6 (n,n) blocks are now redundant with weights_E/weights_I
     initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
     subsample_E = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
     subsample_I = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
