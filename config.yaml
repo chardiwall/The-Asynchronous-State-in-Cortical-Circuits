@@ -165,6 +165,9 @@ spiking_network:
     dt_ms: 0.05
     length_s: 200.0            # 5000 s for the Fig. S6 characterisation run
     n_networks: 10
+  r_bar_sample_size: 1000       # session 2026-09-16/17 grilling: r_bar estimated over all
+    # pairs among this many randomly-sampled E neurons, mirroring Fig. S6's own "1000 E and
+    # 1000 I cells" convention -- not all N_E pairs (~8M, too many) and not an ad hoc sample.
   exploratory:                 # session 2026-09-14 grilling Q1: smoke-test pass, full
     # paper-scale N (unlike block 2 -- g^ab are fixed nS, not 1/sqrt(N)-scaled, so
     # shrinking N would starve every neuron of input and land in a different regime).

@@ -13,27 +13,12 @@ import brian2 as b2
 import numpy as np
 
 from analysis import spike_count_correlation
+from block3.eval import population_rate_hz, spike_times_by_neuron
 from block3.model import build_network
 from config import load_config
 
 LOG_PATH = "artifacts/block3_exploratory_pass.log"
 N_PAIRS_FOR_R_SAMPLE = 25  # exploratory sample only, not Fig. 3B's real pair count
-
-
-def _population_rate_hz(spike_monitor, n_neurons, burn_in_ms, duration_ms) -> float:
-    t_ms = np.asarray(spike_monitor.t / b2.ms)
-    n_spikes_after_burn_in = int(np.sum(t_ms >= burn_in_ms))
-    recorded_s = (duration_ms - burn_in_ms) / 1000.0
-    return n_spikes_after_burn_in / (n_neurons * recorded_s)
-
-
-def _spike_times_by_neuron(spike_monitor, n_neurons, burn_in_ms) -> list[list[float]]:
-    t_ms = np.asarray(spike_monitor.t / b2.ms)
-    neuron_index = np.asarray(spike_monitor.i)
-    after_burn_in = t_ms >= burn_in_ms
-    return [
-        list(t_ms[after_burn_in & (neuron_index == n)] - burn_in_ms) for n in range(n_neurons)
-    ]
 
 
 def run_exploratory_pass(config: dict) -> dict:
@@ -55,13 +40,13 @@ def run_exploratory_pass(config: dict) -> dict:
 
     n_e = net_config["populations"]["n_excitatory"]
     n_i = net_config["populations"]["n_inhibitory"]
-    rate_e_hz = _population_rate_hz(net.spikes_e, n_e, burn_in_ms, length_ms)
-    rate_i_hz = _population_rate_hz(net.spikes_i, n_i, burn_in_ms, length_ms)
+    rate_e_hz = population_rate_hz(net.spikes_e, n_e, burn_in_ms, length_ms)
+    rate_i_hz = population_rate_hz(net.spikes_i, n_i, burn_in_ms, length_ms)
 
     analysis_config = config["analysis"]
     recorded_ms = length_ms - burn_in_ms
     n_sample_neurons = min(n_e, 2 * N_PAIRS_FOR_R_SAMPLE)
-    ee_spike_times = _spike_times_by_neuron(net.spikes_e, n_sample_neurons, burn_in_ms)
+    ee_spike_times = spike_times_by_neuron(net.spikes_e, n_sample_neurons, burn_in_ms)
     r_values = [
         spike_count_correlation(
             ee_spike_times[2 * k], ee_spike_times[2 * k + 1], recorded_ms,
