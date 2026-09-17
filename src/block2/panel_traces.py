@@ -6,7 +6,7 @@ primitives; only what gets recorded at each sample differs.
 import numpy as np
 from numba import njit
 
-from block2.connectivity import build_weights
+from block2.connectivity_stacked import build_weights_stacked
 from block2.fast_model import _tick_jit
 
 
@@ -95,10 +95,7 @@ def _run_jit_cell_components(
 
 def _build_run_inputs(n: int, p: float, j: dict[str, float], seed: int):
     rng = np.random.default_rng(seed)
-    weights = build_weights(n=n, p=p, j=j, rng=rng)
-    weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
-    weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
-    del weights  # the 6 (n,n) blocks are now redundant with weights_E/weights_I
+    weights_E, weights_I = build_weights_stacked(n=n, p=p, j=j, rng=rng)
     initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
     return weights_E, weights_I, initial_state, rng
 

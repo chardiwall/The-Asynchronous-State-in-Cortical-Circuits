@@ -24,11 +24,21 @@ single realisation (an 8x-oversized allocation that silently blocked real
 concurrency on the DGX's Slurm nodes: each task's implicit memory footprint
 left room for only 2-3 concurrent N=8192 tasks per 118GB node, found while
 testing block2.full_pass there). uint8 brings that to ~4.9GB.
+
+Weight matrices are built via connectivity_stacked.build_weights_stacked, not
+connectivity.build_weights + hstack: measured on the DGX (session 2026-09-17,
+/usr/bin/time -v ground truth at N=8192), peak RSS was pinned at ~6.09GB
+regardless of activity-array size (length_tau=1000 and 5000 gave identical
+peaks) -- glibc was not returning build_weights' six now-freed (n,n) matrices
+to the OS after `del`, so that transient (2x the final weights_E/weights_I
+size) stayed counted as resident for the rest of the process's life.
+build_weights_stacked writes each (n,n) block directly into its slice of the
+final (n,3n) arrays, so only one (n,n) block is ever transiently alive.
 """
 import numpy as np
 from numba import njit
 
-from block2.connectivity import build_weights
+from block2.connectivity_stacked import build_weights_stacked
 from block2.simulate import SimulationResult
 
 
@@ -124,10 +134,7 @@ def simulate_fast_one(
     burn_in_ticks = burn_in_tau * ticks_per_tau
 
     rng = np.random.default_rng(seed)
-    weights = build_weights(n=n, p=p, j=j, rng=rng)
-    weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
-    weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
-    del weights
+    weights_E, weights_I = build_weights_stacked(n=n, p=p, j=j, rng=rng)
     initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
 
     return _run_jit(weights_E, weights_I, initial_state, theta, m_x,
@@ -146,10 +153,7 @@ def simulate_fast(
     activity = {pop: np.zeros((n_realisations, n, n_samples), dtype=np.uint8) for pop in ("E", "I", "X")}
     for r in range(n_realisations):
         rng = np.random.default_rng(seed + r)
-        weights = build_weights(n=n, p=p, j=j, rng=rng)
-        weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
-        weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
-        del weights  # the 6 (n,n) blocks are now redundant with weights_E/weights_I
+        weights_E, weights_I = build_weights_stacked(n=n, p=p, j=j, rng=rng)
         initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
 
         result = _run_jit(weights_E, weights_I, initial_state, theta, m_x,
@@ -171,10 +175,7 @@ def simulate_fast_current(
     burn_in_ticks = burn_in_tau * ticks_per_tau
 
     rng = np.random.default_rng(seed)
-    weights = build_weights(n=n, p=p, j=j, rng=rng)
-    weights_E = np.hstack([weights["EE"], weights["EI"], weights["EX"]])
-    weights_I = np.hstack([weights["IE"], weights["II"], weights["IX"]])
-    del weights  # the 6 (n,n) blocks are now redundant with weights_E/weights_I
+    weights_E, weights_I = build_weights_stacked(n=n, p=p, j=j, rng=rng)
     initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
     subsample_E = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
     subsample_I = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
