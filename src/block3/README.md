@@ -1,101 +1,214 @@
-# Block 3 — Recurrent Conductance-Based Spiking Network
+# Block 3 — Recurrent Conductance-Based Spiking Network (Fig. 3)
 
-Implementation notes for `docs/paper/03-recurrent-spiking-network.md` (Fig. 3) — this repo's
-**main reproduction target** (L1) and the network that L2 replaces with a spiking reservoir /
-liquid state machine. This file documents the *implementation*; the paper extraction itself
-lives in `docs/paper/03-recurrent-spiking-network.md` and stays paper-only, no code detail.
+Reproduces main-text Fig. 3: the conductance-based integrate-and-fire version of block 2's
+binary network, with the same architecture but realistic population sizes
+(`N_E = 4000`, `N_I = 1000`, `N_X = 4000`). This is the repo's main reproduction target.
+Fig. 3C–D is the paper's **experimentally testable prediction** and the reason the block
+matters: it shows the cancellation directly in the membrane potential.
 
-## Architecture schematic
+Equations are declared literally against SOM S-p.20–21 (ADR 0001) as a Brian2 model. The
+structural picture — the wiring schematic, the per-neuron and per-synapse equations, the
+comparison against an L2 spiking reservoir, and the phase roadmap — is in
+[`docs/block3-architecture.md`](../../docs/block3-architecture.md). This file is the run guide.
 
-Three populations, densely and independently connected (`p = 0.2` for every ordered pair),
-Dale's-law-respecting (one sign per presynaptic population):
+## ⚠ Things to check before trusting Fig. 3
 
+These are recorded here because they are inferences, not transcriptions.
+
+1. **The `I_app` sweep is incomplete in the source.** Both the main text and the SOM print
+   it with ellipses: `Iapp = −1.3, −0.65, . . . , −0.1, 0, 0.2, 0.74, 1.48, . . . 3.7 nA`.
+   The omitted levels are stated nowhere, and the printed values fit neither an arithmetic
+   nor a geometric series, so they cannot be reconstructed. `config.yaml` carries **only the
+   eight printed values**. Fig. 3D will therefore have eight points where the paper's has
+   more. Add levels to `fig3cd.i_app_nA` if you can source them; do not let me guess them.
+
+2. **Ten recorded cells per condition per network is derived, not stated.** The paper gives
+   only two numbers: 450 pairs for each same-condition curve and 1000 for the EPSP–IPSP
+   curve. Holding 10 cells at each level per network reproduces both exactly —
+   `C(10,2) = 45` same-condition pairs × 10 networks = 450, and `10 × 10 = 100` cross pairs
+   × 10 networks = 1000. No other simple scheme gives both. See `docs/adr/0006`. If you
+   reject it, only `fig3cd.n_recorded_cells_per_condition` and the pair enumeration change.
+
+3. **Fig. 3B's run length is now 5000 s, not 200 s** (fixed 2026-09-30; `panels.length_s`).
+   The panel's claim is that the measured histogram is wide *relative to its jittered null*,
+   and the null's width is pure estimator noise: for independent 1 Hz trains at `T = 50 ms`,
+   σ_r is 0.0128 at 200 s against 0.0026 at 5000 s, on an axis spanning ±0.05. At 200 s the
+   grey histogram was about as wide as the black one and the panel said nothing. Fig. S6
+   states 5000 s for the single-network protocol; Fig. 3's own caption states no length.
+   `r̄` was always fine at 200 s; only `σ_r` was not.
+
+   **But 5000 s is not currently runnable here.** 200 s measured 27h07m on this node, so
+   5000 s extrapolates to roughly **28 days** for a single job with no checkpointing. The
+   config and the Slurm script now state the correct protocol, but one of these has to give
+   before Fig. 3B can actually be produced: a faster code-generation path (`cpp_standalone`
+   was benchmarked and gave no speedup, so this means Brian2CUDA or Brian2GeNN), splitting
+   the run into resumable segments, or accepting a shorter length and the wider null that
+   comes with it. **Researcher's call — flagged, not decided.**
+
+A fourth, smaller one: **which `I_app` level is the EPSP curve and which the IPSP curve is
+inferred** from the extremes of the swept list. The SOM states the intent ("adjusted to
+isolate the EPSPs and IPSPs in their respective reversal potentials") but never maps a
+level to a curve. `fig3cd.epsp_condition_nA` and `ipsp_condition_nA` hold that reading.
+
+## Run it
+
+From the **repo root** with `PYTHONPATH=src`. This network has about 9 million synapses, so
+only the smoke test is local.
+
+### Step 0 — smoke test (local, about 25 minutes)
+
+```bash
+PYTHONPATH=src .env/bin/python -m block3.full_pass 0 --seconds 5
 ```
-                 p=0.2, g^EX=5.4nS                 p=0.2, g^IX=5.4nS
-   X (N=4000) ───────────────────────┐   ┌───────────────────────── X (N=4000)
-   Poisson, 2.5 Hz, no recurrent      │   │
-   input, feeds E and I only         ▼   ▼
-                              ┌─────────────┐
-                p=0.2         │             │        p=0.2
-     ┌───────── g^EE=2.4nS ───│   E (4000)  │─── g^EI=40nS ─────────┐
-     │                        │             │                       │
-     │            ┌───────────┴─────────────┴───────────┐           │
-     │            │                                      │           │
-     ▼            │              p=0.2, g^IE=4.8nS       ▼           ▼
-┌─────────┐       └──────────────────────────────────►┌─────────┐
-│  E (4000) │◄──────────── p=0.2, g^II=40nS ───────────│  I (1000) │
-└─────────┘                                            └─────────┘
+
+Full paper-scale `N` over a short window. Proves the model and the shared analysis pipeline
+are wired correctly: no NaN, non-zero and non-runaway rates. **Not** a statistically
+meaningful `r̄`. Note the `N` is *not* shrunk for this: block 3's conductances are fixed nS
+values rather than `1/√N`-scaled, so a smaller network would starve every neuron of input
+and land in a different dynamical regime, not a cheaper version of this one. Shortening the
+duration is the only cheap knob.
+
+### Step 1 — Fig. 3A–B statistics (cluster, days)
+
+```bash
+sbatch src/block3/full_pass.slurm                                  # 10 networks
+PYTHONPATH=src .env/bin/python -m block3.full_pass --aggregate     # when all 10 land
 ```
 
-(Read as: every ordered population pair `(post ← pre)` has an independent `p=0.2` Bernoulli
-connection and its own mean conductance `g^{post,pre}`; the diagram collapses the usual
-four-quadrant E/I wiring diagram into one box per population to keep it legible.)
+Writes `artifacts/block3_full_pass.csv`: per-network E and I rates and `r̄`.
 
-**Per neuron** (population `α ∈ {E, I}`; `X` has no recurrent input, no membrane equation —
-it is a pure Poisson spike source):
+### Step 2 — Fig. 3A and 3B panel data (cluster, one long run)
 
+```bash
+sbatch src/block3/panels.slurm
 ```
-C_m dV_i^α/dt = −g_L(V_i^α − V_L) + I_i^αE(t) + I_i^αI(t) + I_i^αX(t) + I_i^app   (V_i^α < θ)
+
+One network, one run, both panels, at `panels.length_s` (5000 s — see item 3 above; this is
+the single most expensive job in the repo). Writes `fig3a_raster.csv`, `fig3a_tracking.csv`
+and `fig3b_correlations.csv` to `artifacts/block3_panels/`. Locally with a short window:
+`PYTHONPATH=src .env/bin/python -m block3.panels --seconds 5`
+
+### Step 3 — Fig. 3C–D (cluster, 90 tasks)
+
+```bash
+sbatch src/block3/vm_ccg.slurm
+PYTHONPATH=src .env/bin/python -m block3.vm_ccg --aggregate
 ```
-spike at `θ = −50 mV` → reset to `V_R = −60 mV`, hold `t_ref` (2 ms E, 1 ms I).
 
-**Per synapse** `(i ← j)`, population pair `(α ← β)`:
+90 tasks = 10 networks × (8 current levels + 1 cross condition), each 50 s of simulated
+time. A single condition can be run directly, which is how to test before submitting:
 
+```bash
+PYTHONPATH=src .env/bin/python -m block3.vm_ccg 0 -1.3 3.7   # network 0, EPSP vs IPSP
+PYTHONPATH=src .env/bin/python -m block3.vm_ccg 0            # or by flat task index
 ```
-I_i^αβ(t)      = −[ p_ij^αβ · g_ij^αβ · s_ij^αβ(t) ] · (V_i^α − V_rev^β)
-τ_d ds_ij/dt   = x_ij − s_ij
-τ_r dx_ij/dt   = τ̃ Σ_spikes δ(t − t_j − d_ij) − x_ij
+
+### Step 4 — plot
+
+```bash
+PYTHONPATH=src .env/bin/python -m block3.plot_fig3
 ```
-`g_ij^αβ ~ Gaussian(g^αβ, 0.5·g^αβ)`, resampled if negative (`docs/adr/0004`); delay `d_ij`
-uniform per synapse (`[0.5,1.5]ms` from E, `[0.1,0.9]ms` from I), 0.05 ms resolution. `V_rev^E =
-V_rev^X = 0 mV`, `V_rev^I = −80 mV` — inhibition is both stronger (`g^EI=g^II=40nS` vs.
-`g^EE=2.4nS`, `g^IE=4.8nS`) and faster (shorter delay) than excitation, the precondition for
-**tracking** (see `CONTEXT.md`).
 
-The measurement applied on top (unchanged from blocks 1/2, `src/analysis.py`): population
-firing rates, spike-count correlation `r̄`/`σ_r` (`T=50ms`), current-component correlations —
-the same estimators at every level L1–L4.
+## What "correct" looks like
 
-## Architecture comparison: this network vs. a reservoir / liquid state machine (L2)
+| Panel | Paper's result |
+|---|---|
+| **3A** | E rate **1 spike/s**, I rate **3.6 spikes/s**. Raster irregular, no population bursts. The three z-scored activity curves visibly track each other |
+| **3B** | Histogram wide and centred near zero with `r̄ < 0.001`, and **barely distinguishable from its jittered surrogate** — that near-identity is the asynchronous-state claim |
+| **3C** | Large positive CCG for EPSP–EPSP and for IPSP–IPSP, large **negative** for EPSP–IPSP, near zero at rest |
+| **3D** | A **V-shape**: peak correlation positive at both reversal potentials, minimum near rest |
 
-| | **Block 3 (this network, L1)** | **Spiking reservoir / LSM (L2 target)** |
+The last measured full-pass network gave E = 1.050 Hz and `r̄ = 0.000125`, both on target.
+I came out somewhat above 3.6 Hz on that single network; the paper's figure is a
+population average, so check it across more networks before treating it as a discrepancy.
+
+## Changing the settings
+
+Everything is under `spiking_network` in `config.yaml`.
+
+**Cost versus accuracy:**
+
+| Key | Paper value | Effect |
 |---|---|---|
-| Connectivity | Dense, fixed `p=0.2` for every one of the 9 ordered population pairs; explicitly structured to match block 2's binary network | Typically sparse/random, no population-pair structure prescribed — a generic recurrent graph |
-| Dale's law | Enforced by construction: one sign per presynaptic population (E excitatory, I inhibitory, X excitatory) | Not required; an LSM's recurrent weights are usually signed per-synapse with no population-level sign constraint |
-| Weight heterogeneity | Per-synapse Gaussian around population-pair-specific means (`g^EE`, `g^EI`, …) — 6 distinct means | Usually one random-weight distribution for the whole reservoir, or a spectral-radius-controlled random matrix — no population-specific tuning |
-| What the weights encode | Fitted/assumed to produce a specific studied phenomenon: **tracking** (`m_E(t)=A_E m_X(t)`) and the resulting `c_EI` cancellation | Fixed *not* to reproduce a specific target dynamic — the reservoir's only job is to be a rich, input-driven dynamical substrate |
-| Readout | None — the network's own population activity *is* the object of study (no downstream task) | A trained (linear, or otherwise simple) readout layer maps reservoir state to a task output — central to the LSM's purpose |
-| Is the asynchronous state a design goal? | Yes — it is the paper's claim, and this network is built (dense + strongly coupled) specifically so it emerges dynamically | No — asynchrony is not designed for; L2 asks whether it **survives** the substitution anyway |
-| Training / plasticity | None; all weights fixed at construction | Recurrent weights fixed (as in block 3), but the *readout* is trained — the one place learning happens in an LSM |
-| Role in this repo | L1: the thing being reproduced | L2: the thing block 3's network is swapped out for, keeping block 3's `X` population's Poisson drive and the shared analysis pipeline (`r̄`, `σ_r`, current correlations) fixed, so any change in the measurement is attributable to the network substitution alone |
+| `simulation.length_s` | `200.0` | Simulated seconds per network, for Fig. 3A–B. Dominant cost and the noise floor on `r̄`. Fig. S6 uses 5000 s |
+| `simulation.n_networks` | `10` | Networks averaged in Fig. 3A–B |
+| `fig3cd.length_s` | `50.0` | Per Fig. 3C–D condition. Stated by the SOM |
+| `fig3cd.n_networks` | `10` | Stated by the SOM |
+| `r_bar_sample_size` | `1000` | E neurons subsampled for `r̄` and for Fig. 3B's histogram. Mirrors Fig. S6's own "1000 E and 1000 I cells". Cost here is `O(n²)` in pairs |
+| `burn_in_ms` | `100.0` | **Not from the paper** — it states no warm-up period |
+| `simulation.dt_ms` | `0.05` | Stated. Delays are quantised to this grid |
 
-The comparison matters for L2's question ("does the asynchronous state survive a network
-substitution?") precisely because the two architectures share almost nothing structurally
-(no Dale's law, no population-pair-specific weights, no design intent around tracking) — an LSM
-that still produces `r̄ ~ 1/N` would show the asynchronous state is a broader dynamical
-phenomenon, not an artifact of block 3's specific connectivity choices.
+**Model parameters** (`neuron`, `conductances_nS`, `synapse`, `delays_ms`,
+`external_input`, `connection_probability`, `populations`) all come from SOM S-p.20–21.
+Changing them means you are no longer reproducing Fig. 3.
 
-## Phase roadmap
+**Panel settings:** `fig3a.raster_neurons` (500), `fig3a.tracking_bin_ms` (3.0),
+`fig3b.jitter_ms` (500.0) are all stated in the Fig. 3 caption. `fig3b.n_surrogate_sets`
+is 1 because the grey histogram is one surrogate of the same pairs, not the 500-surrogate
+significance test of S-Eq(41), which is a different procedure for *in vivo* data.
 
-- **Phase 0** — ADR (conductance sign handling) + config + test-first model build. *(this
-  session)*
-- **Phase 1** — Local exploratory pass: full paper-scale `N`, `length_s=5`, single network,
-  Brian2 runtime mode — sanity-check only (NaN-free, non-zero, non-runaway rates). *(this
-  session)*
-- **Phase 2** — Fig. 3A–B full-scale reproduction (`length_s=200`, 5–10 networks) against the
-  paper's targets (E≈1 Hz, I≈3.6 Hz, `r̄<0.001`) — likely needs the DGX/Slurm given ~9M
-  synapses; sizing decided against a measured throughput benchmark, not guessed.
-- **Phase 3** — Fig. S6 detailed characterisation (single network, 5000 s; `r̄` vs. count
-  window `T`; filtered-current correlation vs. `τ_f`).
-- **Phase 4** — Fig. S7 robustness sweeps (`ν_X` 0→40 Hz, `p` 0→0.4, `τ_E` 5→2 ms) — the
-  `p`-sweep is this repo's sharpest single check that the mechanism (not shared-input fraction)
-  sets `r̄`.
-- **Phase 5** — Fig. S8 non-stationary sinusoidal drive (`ν_X(t)`, shift-predictor CCG
-  correction).
-- **Phase 6** — Fig. 3C–D intracellular cancellation protocol (spiking disabled, `I_app` swept,
-  membrane-potential CCGs across 450–1000 pairs, 10 networks).
+## Before the Fig. 3A–B full pass: one unmeasured cost
 
-Each phase is independently completable and checkable against the paper's own stated target for
-that figure/panel (`docs/paper/06-figure-protocols.md`); later phases reuse Phase 0's `model.py`
-unchanged except for the specific protocol modification each panel needs (e.g. Phase 6 disables
-the threshold/reset mechanism for one recorded pair only).
+`eval.pairwise_correlations` builds a `(1000, ~49,950)` float64 rate matrix (about 400 MB)
+and hands it to `numpy.corrcoef`, which internally allocates a centred copy plus the Gram
+matrix. Peak RSS for that step has **not** been measured at full scale — the 3.85 GB figure
+below is from a run that predates it. Measure it once before sizing `--mem`, rather than
+repeating this project's history of OOM kills from unvalidated estimates.
+
+## Compute reality
+
+Brian2's runtime mode needs its Cython headers, which this cluster lacks and there is no
+`sudo`. Both Slurm scripts therefore run inside a pyxis/enroot container that installs
+`python3.12-dev` per task (ADR 0005). Without it Brian2 silently falls back to pure-Python
+codegen, which measured **29× slower** and makes the full pass infeasible.
+
+Measured reference on this node: 200 s of simulated time cost **27h07m** wall and **3.85GB**
+peak RSS. A 200 ms benchmark had extrapolated 67 h, overestimating by about 2.5×, because
+per-timestep fixed overhead amortises far better over a long run. Size new jobs from the
+27-hour figure, and confirm with the `/usr/bin/time -v` log each task writes.
+
+`cpp_standalone` was benchmarked and gave **no speedup** (possibly a regression, not root
+caused). Do not reach for it without re-measuring.
+
+## Module map
+
+| File | Role |
+|---|---|
+| `connectivity.py` | Per-synapse conductance heterogeneity (ADR 0004) and delays, plus the Bernoulli connectivity draw |
+| `model.py` | The Brian2 network: E/I `NeuronGroup`s, X `PoissonGroup`, six `Synapses`. `theta` is a per-neuron parameter so Fig. 3C–D can disable spiking in the recorded cells |
+| `eval.py` | This block's analysis: population rates, per-neuron spike times, neuron subsampling, the pairwise-correlation vector and its `r̄` mean, plus Fig. 3C–D's pair enumeration and CCG peak |
+| `full_pass.py` + `.slurm` | Fig. 3A–B statistics, one network per array task. `--seconds` makes it the smoke test |
+| `panels.py` + `.slurm` | Fig. 3A's raster and tracking curves, Fig. 3B's measured and surrogate histograms |
+| `vm_ccg.py` + `.slurm` | Fig. 3C–D: spiking disabled, `I_app` injected, membrane-potential CCGs |
+| `plot_fig3.py` | All four panels |
+
+## Known deviations from the paper
+
+1. **The three items at the top of this file** — the incomplete `I_app` list, the derived
+   recorded-cell count, and the EPSP/IPSP level assignment.
+2. **No warm-up period is stated**; `burn_in_ms = 100.0` (about 7 membrane time constants)
+   is this project's choice.
+3. **X's conduction delay range is assumed** to follow the excitatory range, since
+   `V_rev^X = V_rev^E` makes X excitatory-type. The paper gives ranges only "from excitatory
+   cells" and "from inhibitory cells".
+4. **Fig. 3A's "500 E and I neurons" is read as 500 total**, split between E and I in
+   proportion to population size. The caption does not say whether it means 500 of each.
+5. **The synaptic drive is first-order in time, despite `rk2`.** The paper specifies
+   second-order Runge-Kutta and every group here requests it, but Brian2's `(summed)`
+   mechanism computes `I_E`/`I_I`/`I_X` from the start-of-step `V` and holds them constant
+   across the step. So `rk2` applies to the leak plus those frozen currents while the
+   conductance term is effectively Euler. This is inherent to `(summed)`, not a choice, and
+   at `dt = 0.05 ms` against `τ_r = 1 ms` it is the dominant discretisation error.
+6. **The membrane-potential CCG is a Pearson correlation coefficient**, sampled at 1 ms.
+   The SOM says only "we computed cross-correlograms of the voltages" and gives no formula
+   or bin; S-Eq(42)'s spike-train normalisation by `ν_i ν_j` has no meaning for a voltage.
+   A correlation coefficient is the reading consistent with Fig. 3D plotting a peak height.
+7. **Cells with spiking disabled stop driving their targets.** With 10 cells per condition
+   out of 4000 the perturbation is small but not zero. Each task runs one condition pair
+   rather than all levels at once, to keep it that way.
+
+## Out of scope so far
+
+Supplementary Figs. S6, S7 and S8 (detailed characterisation, robustness sweeps, sinusoidal
+drive). Their roadmap is in [`docs/block3-architecture.md`](../../docs/block3-architecture.md);
+none of them needs a change to `model.py`, only a different protocol and analysis.

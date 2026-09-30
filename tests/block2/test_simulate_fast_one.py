@@ -1,8 +1,6 @@
 """Seam: simulate_fast_one -- a single realisation's raw (3n, n_samples) result,
-without simulate_fast's dict-of-realisations copy (full_pass.py's memory fix,
-docs/adr/0003). Statistically consistent with simulate_fast(n_realisations=1)
-at the same seed -- not bit-identical, since simulate_fast still goes through
-its own weights/state construction path independently.
+the shape full_pass.py consumes directly, with no intermediate per-realisation copy
+(the memory fix in docs/adr/0003).
 """
 import numpy as np
 

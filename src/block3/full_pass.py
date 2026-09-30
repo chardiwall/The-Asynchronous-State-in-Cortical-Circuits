@@ -4,7 +4,12 @@ task via a Slurm array, run_one_task.slurm). Each task builds and runs one full 
 network, computes its summary statistics, and returns/writes one row -- mirrors
 block2/full_pass.py's run_one_task shape.
 
-Usage (one task): python -m block3.full_pass <network_index>
+A short run doubles as the smoke test the separate exploratory_pass.py used to be:
+`--seconds 5` runs the same code path at the same paper-scale N over a shorter window,
+so it is a true subset of the full pass rather than a second implementation of it.
+
+Usage (one task): python -m block3.full_pass <network_index> [--seconds N]
+Usage (aggregate): python -m block3.full_pass --aggregate
 """
 import csv
 import sys
@@ -23,6 +28,24 @@ from config import load_config
 
 RESULTS_DIR = "artifacts/block3_full_pass"
 CSV_FIELDS = ["network_index", "rate_excitatory_hz", "rate_inhibitory_hz", "r_bar_EE", "nan_free"]
+
+
+def parse_length_s(argv: list[str], default: float) -> float:
+    """The `--seconds N` override, parsed strictly.
+
+    A malformed invocation RAISES rather than falling back to `default`. That matters more
+    than it looks: the flag exists so a 5-second smoke test can be run before a Slurm array
+    is submitted whose tasks each cost many hours, and a silent fallback would turn the
+    check into the very paper-scale run it was meant to de-risk -- while appearing to
+    succeed.
+    """
+    if len(argv) <= 2:
+        return default
+    if argv[2] != "--seconds":
+        raise ValueError(f"unrecognised argument {argv[2]!r}; the only option is --seconds N")
+    if len(argv) < 4:
+        raise ValueError("--seconds needs a value, e.g. --seconds 5")
+    return float(argv[3])
 
 
 def run_one_task(network_index: int, config: dict, duration_ms: float) -> dict:
@@ -90,7 +113,8 @@ def main():
 
     network_index = int(sys.argv[1])
     config = load_config("config.yaml")
-    duration_ms = config["spiking_network"]["simulation"]["length_s"] * 1000.0
+    duration_ms = parse_length_s(
+        sys.argv, config["spiking_network"]["simulation"]["length_s"]) * 1000.0
 
     row = run_one_task(network_index, config, duration_ms)
 

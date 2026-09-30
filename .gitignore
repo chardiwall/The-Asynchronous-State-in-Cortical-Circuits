@@ -33,3 +33,10 @@ docs/paper/*.md
 # OS / editor
 .DS_Store
 *.swp
+
+# Agent skills installed via `npx skills add` (168 skills, not project source)
+.agents/
+skills-lock.json
+
+# to-tickets working area
+.scratch/

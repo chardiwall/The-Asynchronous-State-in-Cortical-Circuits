@@ -8,7 +8,7 @@ shared seed for structural equivalence.
 import numpy as np
 
 from block2.connectivity import build_weights
-from block2.connectivity_stacked import build_weights_stacked
+from block2.connectivity import build_weights_stacked
 
 N = 200
 P = 0.2

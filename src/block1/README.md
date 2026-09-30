@@ -1,94 +1,154 @@
-# Block 1 — Postsynaptic Pair (Fig. 1 reproduction)
+# Block 1 — Feedforward Postsynaptic Pair (Fig. 1)
 
-Reproduces Block 1 of Renart et al. 2010, *The Asynchronous State in Cortical Circuits*
-(*Science* 327): the feedforward postsynaptic-pair model behind main-text Fig. 1. This is
-the `L1` level of this project (see the repo root `README.md`'s four-level table) — the
-first, smallest reproduction target before Blocks 2/3 show the same mechanism holds in
-full recurrent networks.
+Reproduces main-text Fig. 1 of Renart et al. 2010, *The Asynchronous State in Cortical
+Circuits* (*Science* 327:587): two independent current-based LIF neurons driven by
+partly-shared, partly-correlated Poisson input. This is the smallest scale at which the
+paper's central mechanism appears — weak input correlation is hugely amplified by summing
+over many inputs, and matched inhibition cancels that amplification.
 
-## The network
+**Status: complete.** All four panels have been produced. See the root `PROGRESS.md` for
+the actual numbers from the last run.
 
-Two independent, current-based leaky-integrate-and-fire (LIF) neurons ("cell A", "cell B"),
-each driven by its own feedforward presynaptic input. **There is no recurrent connectivity
-between them** — this is purely feedforward, isolating how shared/correlated *input alone*
-shapes *output* correlation, before the rest of the paper adds recurrence.
+## Run it
 
-Membrane equation (S-p.19):
+Everything runs from the **repo root** with `PYTHONPATH=src`. Nothing here needs the
+cluster; the full pass is long but single-process.
+
+```bash
+# 1. The sweep (this is the expensive one -- see Cost below)
+PYTHONPATH=src .env/bin/python -m block1.full_pass
+
+# 2. Panels 1B and 1E, from the CSV the sweep just wrote
+PYTHONPATH=src .env/bin/python -m block1.plot_fig1
+
+# 3. Panels 1C and 1F -- illustrative traces, fresh short simulation, ~seconds
+PYTHONPATH=src .env/bin/python -m block1.plot_fig1_traces        # 500 ms window
+PYTHONPATH=src .env/bin/python -m block1.plot_fig1_traces 1000   # or pick your own
 ```
-τ_m dV/dt = -V + J_E·Σs_i^E(t) - J_I·Σs_i^I(t)     (if V < θ)
-```
-On `V ≥ θ`: spike, reset to `V_R`, clamp for the refractory period `t_ref`. `J_E`, `J_I` are
-calibrated (`calibration.py`) so a single presynaptic spike produces a ±0.75 mV PSP.
 
-## The input
+Outputs land in `artifacts/`: `block1_full_pass.csv`, then `fig1b.png`, `fig1e.png`,
+`fig1c.png`, `fig1f.png`.
 
-Each cell receives `N_E=250` excitatory (and, in the E+I condition, `N_I=220` inhibitory)
-presynaptic Poisson spike trains. Two independent parameters control how correlated the two
-cells' *inputs* are with each other:
+## What each panel is, and what "correct" looks like
 
-- **`p`** — literal sharing: a fraction `p` of each cell's `N` inputs are the *exact same*
-  spike train, delivered identically to both cells.
-- **`r_in`** — statistical correlation: the remaining `(1-p)N` inputs are drawn from a single
-  shared "mother-train" pool (thin one high-rate parent Poisson process per child, then
-  jitter each spike — the Kuhn/Aertsen/Rotter method). Every pair among these pooled
-  children is correlated at `r_in` — including two inputs onto the *same* cell, not just
-  matched cross-cell pairs. This detail matters: it's what makes the amplification in
-  M-Eq(1) come out right (see `PROGRESS.md`'s Phase 3 derivation for why the naive
-  "index-paired" reading would silently fail to reproduce it).
+| Panel | Command | Paper's result |
+|---|---|---|
+| **1B** | `plot_fig1` | `c` and `r_out` both grow roughly linearly with the shared fraction `p`, staying below about 0.4 at `p = 0.4` |
+| **1E** | `plot_fig1` | The E-only curve rises steeply, `r_out` approaching 1 by `r_in ≈ 0.1`. The E+I curve stays strongly suppressed over the same range. **This contrast is the whole point of the block.** |
+| **1C** | `plot_fig1_traces` | E-only example trial at `p = 0.2`, `r_in = 0.025` |
+| **1F** | `plot_fig1_traces` | Same point with I added. E and I currents excurse together and cancel in the total |
 
-## The output — what's measured
+## Changing the settings
 
-- **`c`** — Pearson correlation of the two cells' total synaptic current traces
-  (`i_syn_a_mV`, `i_syn_b_mV`).
-- **`r_out`** — Pearson correlation of the two cells' *output spike* trains, via a `T=50ms`
-  sliding-window rate estimate (S-Eq 34–37).
+Every number lives in `config.yaml` under `pair_model`. Nothing is hardcoded in Python.
 
-Both come from the *same shared measurement pipeline* (`src/analysis.py`, one level up) that
-every block and every level (L1–L4) of this project uses identically — deliberately not
-block1-scoped, so a later block/level's numbers stay comparable to this one's.
+**To trade accuracy for time** — this is the knob you want first:
 
-## Objectives — what we're looking for
+| Key | Paper value | Effect |
+|---|---|---|
+| `simulation.length_s` | `10000.0` | Simulated seconds per sweep point. The dominant cost, and what sets the noise floor on every `c` and `r_out`. Halving it roughly halves runtime and widens the error by about √2. |
+| `simulation.chunk_duration_s` | `500.0` | Memory/runtime trade only, **not** accuracy. Chunking is mathematically exact (`analysis.StreamingCorrelation`). Lower it if you hit memory pressure. |
+| `simulation.dt_ms` | `0.05` | Integration step. Do not raise it without re-running the calibration below. |
 
-This block builds the core intuition the rest of the paper depends on: does shared/correlated
-*input* drive output *correlation*, and can matched inhibition cancel that effect?
+**To change what is swept:**
 
-- **Fig. 1B** (`p` swept `0→0.4`, E-only, `r_in=0`): `c` and `r_out` should grow roughly
-  linearly with `p`, staying moderate (`≲0.4` at `p=0.4`).
-- **Fig. 1E** (`r_in` swept, `p=0.2` fixed): the **E-only** curve should rise steeply
-  (`r_out → ~1` by `r_in≈0.1`) — weak input correlations get massively amplified by summing
-  over `N=250` inputs (M-Eq 1: `c ≈ p + N·r_in`). The **E+I** curve should stay strongly
-  suppressed across the same range — matched inhibitory correlation cancels the
-  amplification. **This E-only-vs-E+I contrast is the paper's central mechanism**, reproduced
-  here at the smallest possible scale (2 neurons, purely feedforward) before Blocks 2/3 show
-  it survives in full recurrent networks.
-- **Fig. 1C / 1F**: example single-trial traces at `p=0.2, r_in=0.025` — visually showing
-  simultaneous E/I current excursions that cancel in the total current (1F specifically).
+| Key | Paper value | Meaning |
+|---|---|---|
+| `sweeps.shared_fraction_grid` | `[0.0, 0.1, 0.2, 0.3, 0.4]` | Fig. 1B's `p` points |
+| `sweeps.r_in_grid` | `[0.0, 0.01, 0.025, 0.05, 0.1]` | Fig. 1E's `r_in` points |
+| `sweeps.p_fixed` | `0.2` | `p` held fixed for 1C, 1E, 1F |
+| `sweeps.r_in_fig1f_example` | `0.025` | The example point 1C and 1F illustrate |
+
+Adding grid points costs time linearly but they all batch into one Brian2 run per chunk,
+so the marginal cost of one more point is small compared with one more second of `length_s`.
+
+**Model parameters** (`pair_model.neuron`, `.synapse`, `.inputs`) are all transcribed from
+SOM S-p.19. Changing any of them means you are no longer reproducing the paper.
+
+## The one calibrated value
+
+`inputs.rate_e_only_calibrated_hz` (`4.04297` Hz) is **not** from the paper. The paper
+states 20 Hz for the E+I condition but never states the E-only input rate. It is derived
+by bisection so that the E-only cell fires at 5 Hz output when `r_in = 0`, which is the
+condition the paper's Fig. 1E curve implies. `calibrate_rate.py` holds that derivation.
+
+If you change `n_excitatory`, `tau_m_ms`, `epsp_peak_mV`, or the threshold, **this value is
+stale** and must be re-derived before the E-only curve means anything.
+
+`J_E` and `J_I` are also calibrated rather than read from config: `calibration.py` solves
+numerically for the weights that give a ±0.75 mV single-spike PSP, which is what the paper
+specifies. That happens automatically on every run.
+
+## Cost
+
+At the paper's `length_s = 10000.0`, all 21 sweep points batch into one Brian2 `NeuronGroup`
+of 42 neurons (two cells per point) and run chunk by chunk. The dominant cost is Brian2's
+per-timestep work over the full 10,000 simulated seconds at `dt = 0.05 ms`. Consult `PROGRESS.md` for the last
+measured wall-clock time on this machine rather than trusting an estimate here.
+
+For a quick check that the pipeline works, set `length_s` to something like `100.0`. The
+curves will be visibly noisy but the E-only-versus-E+I contrast should already be obvious.
 
 ## Module map
 
-One main script (`full_pass.py`) plus focused helpers, all living in this directory —
-no separate top-level `scripts/`.
-
 | File | Role |
 |---|---|
-| `calibration.py` | Closed-form + Brian2-verified synaptic weight calibration (`J_E`, `J_I`) |
-| `model.py` | The two-neuron pair model (`simulate_pair`) — the tested foundation every other module builds on; also used directly for small one-off runs (calibration, illustrative traces) |
-| `current_trace.py` | Precomputed synaptic current traces (ADR 0002), replacing per-event Brian2 objects — needed at the paper's real input volume |
-| `dataset.py` | Input generation — literal sharing (`p`) + mother-train correlation (`r_in`) |
-| `calibrate_rate.py` | Numerically calibrates the E-only input rate (an ambiguity the paper leaves unstated) |
-| `batched_model.py` | `simulate_pairs_batch` — N independent pairs (e.g. all 15 sweep points) in ONE Brian2 `NeuronGroup(2N)` instead of N separate runs; exact, not an approximation, since the points don't couple (see module docstring). This is what makes the production sweep GPU-friendly. |
-| `full_pass.py` | **Main script.** Builds the Fig. 1B/1E sweep grid, runs it via `batched_model` (chunked over time), writes a structured CSV. `python -m block1.full_pass` |
+| `model.py` | `simulate_pair` — the two-neuron pair. The tested foundation, used directly for calibration and illustrative traces |
+| `dataset.py` | Input generation: literal sharing (`p`) plus mother-train correlation (`r_in`) |
+| `current_trace.py` | Precomputed synaptic current traces (ADR 0002), replacing per-event Brian2 objects |
+| `calibration.py` | Solves for `J_E`, `J_I` from the ±0.75 mV PSP specification |
+| `calibrate_rate.py` | Derives the E-only input rate the paper leaves unstated |
+| `batched_model.py` | `simulate_pairs_batch` — all sweep points in ONE `NeuronGroup(2N)`. Exact, since the points do not couple |
+| `chunking.py` | Drives the batch over a long run, carrying V, `lastspike` and filter state across chunks |
+| `full_pass.py` | **Main script.** Builds the grid, runs it, writes the CSV |
 | `eval.py` | Qualitative trend checks against the paper's stated results |
-| `plot_fig1.py` | All four Fig. 1 plots: 1B/1E from `full_pass`'s CSV (combined panels, `c` dashed / `r_out` `-o-`), 1C/1F bespoke illustrative traces (raster / current / V, scale bars) |
+| `plot_fig1.py` | Panels 1B and 1E from the CSV |
+| `plot_fig1_traces.py` | Panels 1C and 1F, illustrative traces |
 
-`eval.py`'s trend checks and small-scale correctness sweeps that predate the batched
-production path are exercised through `model.simulate_pair` directly in the test suite
-(`tests/block1/test_model.py`, `test_model_chunking.py`, `test_integration.py`) rather
-than through a separate sweep-runner module.
+## ⚠ Before running the full pass: one value must be derived first
 
-## Status
+`block1.full_pass` **raises** until you derive the E+I input rate:
 
-See the project root's `PROGRESS.md` for the authoritative, up-to-date status — what's been
-run, at what scale, with what actual numbers. `docs/adr/0001` and `0002` record the two
-hard-to-reverse decisions behind this block (Brian2 as the simulation framework; precomputed
-current traces over per-event objects for scalability).
+```bash
+PYTHONPATH=src .env/bin/python -m block1.calibrate_rate e_plus_i
+```
+
+then paste the printed value into `config.yaml` as `rate_e_plus_i_calibrated_hz`.
+
+**Why.** The supplement says "The input firing rate was set to 20 spikes/s **to produce an
+output rate of 5 spikes/s** when r_in = 0". Measured with this repo's parameters, 20 spikes/s
+produces **12.05 ± 2.57** spikes/s. The PSP calibration, the analytic mean drive and the
+free-membrane statistics each check out independently, so this is not a simulation artefact —
+the paper's two numbers are not consistent with each other here. The decision (2026-09-30) is
+to honour the stated *output* rate and recalibrate the input, exactly as this project already
+resolved the unstated E-only rate, so that both Fig. 1E curves share an operating point, which
+is what the caption means by "identical statistics". The code raises rather than silently
+falling back to 20 spikes/s, which would leave the two curves at ~5 and ~12 spikes/s.
+
+## Fixed 2026-09-30: the shared inputs were not mother-train children
+
+`dataset.py` drew the `p·N` literally-shared trains as **independent** Poisson processes, so
+they carried none of the mother train's correlation. The supplement says "**Each**
+pre-synaptic train was a thinned version of the mother train". This biased the current
+correlation low by about 10% at `r_in = 0.01` and 5.5% at `r_in = 0.025`, the marked circle
+of Figs. 1C and 1F. All trains now come from one mother pool, pinned by a regression test that
+fails on the old construction.
+
+**Any Fig. 1E produced before 2026-09-30 carries that bias** and should be regenerated once
+the E+I rate above is derived. Fig. 1B (`r_in = 0`) is unaffected.
+
+## Still open
+
+**The `r_in` grid covers a quarter of the paper's axis.** Fig. 1E sweeps `r_in` over
+`(0, 0.4)`; `sweeps.r_in_grid` stops at `0.1`. Widen it to reproduce the full panel.
+
+## Known deviations from the paper
+
+1. **The E-only input rate is calibrated, not stated** (above).
+2. **Current is in mV, not nA.** The model is current-based with `V` relative to rest, so
+   the natural unit here is mV. The paper's 1C/1F scale bar is in nA. Shape and correlation
+   are unaffected; only the axis label differs.
+3. **The 1C/1F raster shows a subsample of individual trains.** The model pools all ~250
+   to 470 arrivals into one stream internally, which would render as a solid block. The
+   displayed trains are drawn at the same rate and `r_in`, so the correlation structure is
+   representative, but they are not literally the trains driving the plotted traces.

@@ -26,7 +26,10 @@ the width `σ_r` of its distribution, the current-component correlations
 | `docs/adr/` | architecture decision records (one file per decision) |
 | `docs/*.pdf` | the source PDFs |
 | `config.yaml` | every seed, path and model parameter — nothing is hardcoded in code |
-| `src/` | `dataset.py`, `model.py`, `train.py`, `eval.py` |
+| `src/analysis.py` | the shared measurement pipeline, used identically by every block |
+| `src/block1/` | Fig. 1 — feedforward postsynaptic pair ([README](src/block1/README.md)) |
+| `src/block2/` | Fig. 2 — recurrent binary network ([README](src/block2/README.md)) |
+| `src/block3/` | Fig. 3 — recurrent conductance-based spiking network ([README](src/block3/README.md)) |
 | `tests/` | tests, written before the code they cover |
 | `data/raw/` | **read-only** source data |
 | `data/processed/` | generated data |
@@ -38,9 +41,22 @@ the width `σ_r` of its distribution, the current-component correlations
 
 ## Status
 
-Documentation phase complete; no simulation code written yet. Simulation framework decided:
-**Brian2** ([ADR 0001](docs/adr/0001-brian2-as-simulation-framework.md)). Next up is the shared
-analysis pipeline (test-first), then Fig. 3A–B as the first reproduction target.
+All three L1 blocks are implemented for the paper's **main-text** figures. Each block's own
+README is the run guide: exact commands per panel, which `config.yaml` keys trade cost against
+accuracy, the paper's target result, and that block's known deviations from the paper.
+
+| Block | Figure | Code | Results |
+|---|---|---|---|
+| 1 | Fig. 1 B/C/E/F | complete | produced |
+| 2 | Fig. 2 B/C/D/E/G | complete | Fig. 2C's two sweeps are long cluster jobs; see `PROGRESS.md` |
+| 3 | Fig. 3 A/B/C/D | complete | Fig. 3A–B partially produced; Fig. 3C–D not yet run |
+
+Fig. 2A and 2F are schematics in the paper, not simulations, so nothing is generated for them.
+Supplementary Figs. S2–S8 are **out of scope** so far.
+
+`PROGRESS.md` is authoritative for what has actually been run, at what scale, with what
+numbers. Two values in Fig. 3C–D's configuration are inferences rather than transcriptions and
+are flagged at the top of [`src/block3/README.md`](src/block3/README.md).
 
 ## Working agreement
 

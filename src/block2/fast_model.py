@@ -1,45 +1,31 @@
-"""Numba-JIT'd Glauber dynamics (docs/paper/02-binary-network.md, same math as
-model.py/simulate.py -- the pure-Python versions stay the tested reference
-implementation, used at exploratory scale). Session 2026-09-11: the pure-Python
-loop measured ~29h/realisation at N=8192, length_tau=200,000 (~60 days for the
-paper's 50 realisations) -- too slow for the full pass; this closes that gap.
+"""Numba-JIT'd Glauber dynamics (docs/paper/02-binary-network.md) -- the production
+path for block 2's full pass. Same math as model.py/simulate.py, which stay the tested
+pure-Python reference implementation used at exploratory scale and as this module's
+correctness oracle. Session 2026-09-11: the pure-Python loop measured ~29h/realisation
+at N=8192, length_tau=200,000 (~60 days for the paper's 50 realisations) -- too slow for
+the full pass; this closes that gap.
 
 nopython mode can't take a dict of named (n,n) arrays, so state and weights are
-restructured: one concatenated (3n,) state vector (E,I,X in order) and two
-stacked (n,3n) weight matrices, weights_E=[EE|EI|EX], weights_I=[IE|II|IX].
-Cross-checked against model.py/simulate.py statistically (not bit-for-bit --
-Numba's RNG and numpy's Generator are different algorithms), not exactly.
+restructured: one concatenated (3n,) state vector (E,I,X in order) and two stacked
+(n,3n) weight matrices, weights_E=[EE|EI|EX], weights_I=[IE|II|IX] (built directly by
+connectivity.build_weights_stacked -- see its docstring for why the stacked layout is a
+memory fix, not an optimisation). Cross-checked against model.py/simulate.py
+statistically, not bit-for-bit: Numba's RNG and numpy's Generator are different
+algorithms.
 
-No cache=True on these @njit functions: many worker processes (block2.parallel)
-compiling the same function for the first time simultaneously race on Numba's
-shared on-disk cache file, which crashed worker processes on the DGX
-(BrokenProcessPool, no OOM/error signature -- reproduced with 20 workers, not 2).
-Each process now compiles in-memory instead (a ~1-2s one-time cost per process,
-negligible against a real run's duration).
+No cache=True on these @njit functions: concurrent first-time compiles of the same
+function race on Numba's shared on-disk cache file, which crashed worker processes on
+the DGX. Each process compiles in-memory instead (~1-2s once per process).
 
 Recorded activity is stored as uint8, not float64: state values are strictly
-Heaviside-thresholded 0/1 (S-Eq 5-7), so this is lossless, and it matters at
-scale -- at N=8192, length_tau=200,000 the float64 array would be ~39GB for a
-single realisation (an 8x-oversized allocation that silently blocked real
-concurrency on the DGX's Slurm nodes: each task's implicit memory footprint
-left room for only 2-3 concurrent N=8192 tasks per 118GB node, found while
-testing block2.full_pass there). uint8 brings that to ~4.9GB.
-
-Weight matrices are built via connectivity_stacked.build_weights_stacked, not
-connectivity.build_weights + hstack: measured on the DGX (session 2026-09-17,
-/usr/bin/time -v ground truth at N=8192), peak RSS was pinned at ~6.09GB
-regardless of activity-array size (length_tau=1000 and 5000 gave identical
-peaks) -- glibc was not returning build_weights' six now-freed (n,n) matrices
-to the OS after `del`, so that transient (2x the final weights_E/weights_I
-size) stayed counted as resident for the rest of the process's life.
-build_weights_stacked writes each (n,n) block directly into its slice of the
-final (n,3n) arrays, so only one (n,n) block is ever transiently alive.
+Heaviside-thresholded 0/1 (S-Eq 5-7), so this is lossless, and at N=8192,
+length_tau=200,000 it is the difference between ~4.9GB and ~39GB for one realisation.
 """
 import numpy as np
 from numba import njit
 
-from block2.connectivity_stacked import build_weights_stacked
-from block2.simulate import SimulationResult
+from block2.connectivity import build_weights_stacked
+from block2.simulate import _ticks_per_sample
 
 
 @njit
@@ -89,13 +75,21 @@ def _run_jit(
 def _run_jit_current(
     weights_E: np.ndarray, weights_I: np.ndarray, initial_state: np.ndarray,
     theta: float, m_x: float, burn_in_ticks: int, n_samples: int, ticks_per_sample: int,
-    subsample_E: np.ndarray, subsample_I: np.ndarray, seed: int,
+    subsample_E: np.ndarray, seed: int,
 ) -> np.ndarray:
-    """Same tick sequence as _run_jit, but records TOTAL current h_i (S-Eq 7, via
-    the same _afferent_current_jit) for a subsample of E/I neurons at each sample,
-    instead of binary state -- what Fig. 2C's c_EE/c_II/c_EI need. Subsampling
-    (not all N neurons) keeps this affordable at N=8192: current is a continuous
-    float, not the 0/1 state uint8 can hold.
+    """Same tick sequence as _run_jit, but at each sample records the three CURRENT
+    COMPONENTS (E, I, X) of a subsample of E cells instead of their binary state --
+    what Fig. 2C's and Fig. 2E's decomposition needs (main text p.588).
+
+    Components, not the total: c_EE is the correlation between the E-COMPONENTS of two
+    cells' currents. weights_E's row layout is [EE|EI|EX], each block n wide, so the three
+    components are three slices of one row -- the same inner loop
+    panel_traces._run_jit_cell_components uses for Fig. 2B.
+
+    theta is deliberately not subtracted: it is a constant offset, so it cancels out of
+    every covariance and every standard deviation in the decomposition.
+
+    Returns (3, len(subsample_E), n_samples) in E, I, X order.
     """
     n = weights_E.shape[0]
     state = initial_state.copy()
@@ -104,33 +98,34 @@ def _run_jit_current(
     for _ in range(burn_in_ticks):
         _tick_jit(state, weights_E, weights_I, theta, m_x, n)
 
-    n_subsample = len(subsample_E) + len(subsample_I)
-    current = np.zeros((n_subsample, n_samples), dtype=np.float32)
+    components = np.zeros((3, len(subsample_E), n_samples), dtype=np.float32)
     for sample_idx in range(n_samples):
         for _ in range(ticks_per_sample):
             _tick_jit(state, weights_E, weights_I, theta, m_x, n)
-        for k, i in enumerate(subsample_E):
-            current[k, sample_idx] = _afferent_current_jit(state, weights_E[i], theta)
-        offset = len(subsample_E)
-        for k, i in enumerate(subsample_I):
-            current[offset + k, sample_idx] = _afferent_current_jit(state, weights_I[i], theta)
-    return current
+        for k in range(len(subsample_E)):
+            row = weights_E[subsample_E[k]]
+            e_component, i_component, x_component = 0.0, 0.0, 0.0
+            for q in range(n):
+                e_component += row[q] * state[q]
+                i_component += row[n + q] * state[n + q]
+                x_component += row[2 * n + q] * state[2 * n + q]
+            components[0, k, sample_idx] = e_component
+            components[1, k, sample_idx] = i_component
+            components[2, k, sample_idx] = x_component
+    return components
 
 
 def simulate_fast_one(
     n: int, p: float, j: dict[str, float], m_x: float, theta: float,
     length_tau: int, sampling_rate: int, burn_in_tau: int, seed: int,
 ) -> np.ndarray:
-    """Single realisation, returns the raw (3n, n_samples) uint8 result directly --
-    not simulate_fast's dict-of-realisations shape (needed when several
-    realisations must be retained together). A caller needing just one
-    realisation's summary stats can slice views straight off this array instead
-    of paying for a second full copy into a separate activity dict -- found
-    costing full_pass.py real memory (OOM at N=8192, see docs/adr/0003).
+    """One realisation, returned as the raw (3n, n_samples) uint8 array. full_pass.py
+    slices E/I/X views straight off it, so no second copy into a per-population dict is
+    ever made -- that copy was real, measured memory (OOM at N=8192, docs/adr/0003).
     """
     n_samples = length_tau * sampling_rate
     ticks_per_tau = 3 * n
-    ticks_per_sample = ticks_per_tau // sampling_rate
+    ticks_per_sample = _ticks_per_sample(n, sampling_rate)
     burn_in_ticks = burn_in_tau * ticks_per_tau
 
     rng = np.random.default_rng(seed)
@@ -141,46 +136,23 @@ def simulate_fast_one(
                      burn_in_ticks, n_samples, ticks_per_sample, seed)
 
 
-def simulate_fast(
-    n: int, p: float, j: dict[str, float], m_x: float, theta: float,
-    length_tau: int, sampling_rate: int, n_realisations: int, burn_in_tau: int, seed: int,
-) -> SimulationResult:
-    n_samples = length_tau * sampling_rate
-    ticks_per_tau = 3 * n
-    ticks_per_sample = ticks_per_tau // sampling_rate
-    burn_in_ticks = burn_in_tau * ticks_per_tau
-
-    activity = {pop: np.zeros((n_realisations, n, n_samples), dtype=np.uint8) for pop in ("E", "I", "X")}
-    for r in range(n_realisations):
-        rng = np.random.default_rng(seed + r)
-        weights_E, weights_I = build_weights_stacked(n=n, p=p, j=j, rng=rng)
-        initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
-
-        result = _run_jit(weights_E, weights_I, initial_state, theta, m_x,
-                           burn_in_ticks, n_samples, ticks_per_sample, seed + r)
-        activity["E"][r] = result[:n]
-        activity["I"][r] = result[n:2 * n]
-        activity["X"][r] = result[2 * n:]
-
-    return SimulationResult(activity=activity)
-
-
 def simulate_fast_current(
     n: int, p: float, j: dict[str, float], m_x: float, theta: float,
     length_tau: int, sampling_rate: int, burn_in_tau: int, seed: int, subsample_size: int,
-) -> dict[str, np.ndarray]:
+) -> np.ndarray:
+    """(3, subsample, n_samples) E/I/X current components for a random subsample of E
+    cells. Only E cells are recorded: the decomposition is over the components of one
+    cell's current, so I cells are not needed for it.
+    """
     n_samples = length_tau * sampling_rate
     ticks_per_tau = 3 * n
-    ticks_per_sample = ticks_per_tau // sampling_rate
+    ticks_per_sample = _ticks_per_sample(n, sampling_rate)
     burn_in_ticks = burn_in_tau * ticks_per_tau
 
     rng = np.random.default_rng(seed)
     weights_E, weights_I = build_weights_stacked(n=n, p=p, j=j, rng=rng)
     initial_state = rng.integers(0, 2, 3 * n).astype(np.float64)
     subsample_E = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
-    subsample_I = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
 
-    current = _run_jit_current(weights_E, weights_I, initial_state, theta, m_x,
-                                burn_in_ticks, n_samples, ticks_per_sample,
-                                subsample_E, subsample_I, seed)
-    return {"E": current[:len(subsample_E)], "I": current[len(subsample_E):]}
+    return _run_jit_current(weights_E, weights_I, initial_state, theta, m_x,
+                             burn_in_ticks, n_samples, ticks_per_sample, subsample_E, seed)

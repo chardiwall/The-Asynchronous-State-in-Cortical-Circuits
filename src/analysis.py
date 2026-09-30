@@ -1,6 +1,7 @@
 """The shared measurement pipeline (07-analysis-methods.md), used identically by
 blocks 1, 3 and 4 -- built once, held fixed, reused at every level L1-L4.
 """
+import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -109,3 +110,89 @@ def approx_meq1_current_correlation(p: float, r_in: float, n: int) -> float:
     not clipped, so a caller can detect when the approximation has broken down.
     """
     return p + n * r_in
+
+
+def jitter_spike_times(
+    spike_times_ms, jitter_ms: float, rng: np.random.Generator
+) -> np.ndarray:
+    """A jittered surrogate train: every spike independently displaced by a uniform draw
+    on [-jitter_ms, +jitter_ms] (Fig. S6: "uniform random shift in [-0.5,+0.5] s per
+    spike"; Fig. 3B uses jitter = 500 ms). The slow rate envelope survives but correlation
+    on timescales shorter than the jitter is destroyed -- which is what makes this the null
+    the measured histogram is read against.
+
+    The returned array keeps every spike, but a spike near either end can be displaced
+    outside [0, duration): windowed_rate bins with an explicit range, and numpy.histogram
+    silently discards values outside it. So the count reaching the correlation is preserved
+    only in the interior. At Fig. 3B's scale that is ~500 ms of a ~200 s record (~0.25%,
+    two edge windows) and does not affect the null; it would matter for a short record.
+
+    Distinct from the jitter CORRECTION of S-Eq(38-40), which uses a Gaussian of std J=4T
+    and is applied to non-stationary data; this is the surrogate-generation method, and
+    the paper states its distribution as uniform.
+    """
+    spikes = np.asarray(spike_times_ms, dtype=np.float64)
+    return spikes + rng.uniform(-jitter_ms, jitter_ms, spikes.shape)
+
+
+def lagged_correlation(x: np.ndarray, y: np.ndarray, max_lag: int) -> np.ndarray:
+    """Cross-correlogram of two continuous traces: Pearson correlation of x(t) with
+    y(t+lag), for lag = -max_lag .. +max_lag in samples, each computed over the window
+    where both traces overlap.
+
+    Used for Fig. 3C's membrane-potential CCGs. The paper gives no formula for those
+    ("we computed cross-correlograms of the voltages", S-p.21) -- S-Eq(42)'s 1/(nu_i nu_j)
+    normalisation is specific to spike trains and has no meaning for a voltage. A
+    correlation coefficient is the reading consistent with Fig. 3D, which plots the CCG's
+    peak HEIGHT against holding potential and compares it across conditions.
+
+    Returns NaN at every lag for a constant trace: its variance is zero, so the
+    correlation is undefined rather than zero.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    n = len(x)
+    ccg = np.empty(2 * max_lag + 1)
+    for k, lag in enumerate(range(-max_lag, max_lag + 1)):
+        if lag >= 0:
+            a, b = x[:n - lag], y[lag:]
+        else:
+            a, b = x[-lag:], y[:n + lag]
+        if a.std() == 0 or b.std() == 0:
+            ccg[k] = np.nan
+        else:
+            ccg[k] = np.corrcoef(a, b)[0, 1]
+    return ccg
+
+
+def mean_of_defined_pairs(pairwise: np.ndarray, what: str) -> float:
+    """The project's single rule for undefined pairwise correlations, used by every block.
+
+    A neuron with zero-variance activity -- never spiking, never changing state, saturated --
+    has an undefined correlation with everything, and numpy.corrcoef returns NaN for its
+    whole row. Averaging those in voids the entire realisation, so they are excluded.
+
+    Excluding them is not free: it shrinks the denominator and biases the estimate toward
+    the more active neurons. That is the right trade against losing the realisation
+    outright, but it must not happen quietly, so the count is warned. A run whose reported
+    correlation rests on a shrunken pair set should say so in its log.
+    """
+    pairwise = np.asarray(pairwise, dtype=np.float64)
+    # isfinite, not just isnan: an infinite value would otherwise be counted as excluded
+    # while nanmean still folded it into the mean.
+    defined = pairwise[np.isfinite(pairwise)]
+    undefined = pairwise.size - defined.size
+    if undefined:
+        warnings.warn(
+            f"{what}: {undefined} of {pairwise.size} pairs were undefined (a neuron with "
+            f"zero-variance activity) and were excluded from the mean.",
+            RuntimeWarning, stacklevel=2,
+        )
+    if defined.size == 0:
+        warnings.warn(
+            f"{what}: EVERY pair was undefined, so the result is not a number. The whole "
+            f"population had zero-variance activity -- check the run rather than the mean.",
+            RuntimeWarning, stacklevel=2,
+        )
+        return float("nan")
+    return float(defined.mean())

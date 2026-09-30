@@ -34,7 +34,20 @@ pair_model:
     n_excitatory: 250
     n_inhibitory: 220          # E+I condition only
     rate_shared_sweep_hz: 5.0  # Fig. 1B
-    rate_correlated_sweep_hz: 20.0   # Fig. 1C,E-F E+I condition -- see ambiguity note in docs
+    rate_correlated_sweep_hz: 20.0   # Fig. 1C,E-F E+I condition, the paper's STATED value.
+      # UNUSED for Fig. 1E as of 2026-09-30 -- see rate_e_plus_i_calibrated_hz below. Kept
+      # because it is what the paper says, so the discrepancy stays visible.
+    rate_e_plus_i_calibrated_hz: null   # TO BE DERIVED -- run:
+      #   PYTHONPATH=src .env/bin/python -m block1.calibrate_rate e_plus_i
+      # then paste the printed value here with the settings used, as was done for the
+      # E-only rate below. Resolves ambiguity 3 (found 2026-09-30): the SOM states "The
+      # input firing rate was set to 20 spikes/s TO PRODUCE AN OUTPUT RATE OF 5 spikes/s
+      # when r_in = 0", but 20 spikes/s measured 12.05 +- 2.57 Hz out with these
+      # parameters. PSP calibration, analytic mean drive and free-membrane statistics each
+      # check out independently, so the paper's two numbers are mutually inconsistent here.
+      # Researcher's call: honour the stated OUTPUT rate and recalibrate the input, so both
+      # Fig. 1E curves share an operating point ("identical statistics", per the caption).
+      # block1.full_pass must raise rather than run while this is null.
     rate_e_only_calibrated_hz: 4.04297   # Fig. 1E E-only curve -- resolves ambiguity 1
       # (docs/paper/01-postsynaptic-pair.md): the paper's 20Hz is E+I-only; the E-only rate
       # isn't stated, so it's calibrated by bisection (block1.calibrate_rate) to give 5Hz
@@ -51,7 +64,17 @@ pair_model:
     shared_fraction_grid: [0.0, 0.1, 0.2, 0.3, 0.4]  # actual p sweep points (Fig. 1B, full pass)
     p_fixed: 0.2                     # Fig. 1C,E-F
     r_in: [0.0, 0.4]                 # Fig. 1E range
-    r_in_grid: [0.0, 0.01, 0.025, 0.05, 0.1]  # actual r_in sweep points (Fig. 1E, full pass)
+    r_in_grid: [0.0, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.4]
+      # Fig. 1E's sweep points. Extended 2026-09-30 from a grid that stopped at 0.1 and so
+      # covered only a quarter of the published x-axis, which the `r_in` range above has
+      # always recorded as (0, 0.4). Spacing stays denser at the low end, where the E-only
+      # curve rises steeply and the E-vs-E+I contrast is decided; 0.025 is kept because it
+      # is the example point Figs. 1C and 1F are drawn at.
+      #
+      # Cost: block1.full_pass batches every sweep point into ONE Brian2 NeuronGroup per
+      # time chunk, so this widens that group from 15 points to 21 (5 p-points + 8 r_in
+      # points per condition, 2 conditions) -- about 1.4x the per-timestep width, not 1.4x
+      # the run. Simulated duration (`simulation.length_s`) remains the dominant cost.
     r_in_fig1f_example: 0.025        # blue circle of Fig. 1E; Fig. 1F's traces use this point
   simulation:
     dt_ms: 0.05
@@ -62,6 +85,15 @@ pair_model:
       # simulation, so per-chunk arrays are 15x wider than the original per-point design
       # this value was first set for; kept smaller here (500s not 2000s) to keep peak RSS
       # well under the DGX's 121GB even with that wider batching.
+  calibration_rate:             # bisection settings for block1.calibrate_rate. NOT paper
+    # values -- these are search parameters for resolving the two input-rate ambiguities.
+    duration_ms: 20000.0        # per trial; long enough that a ~5Hz output is ~100 spikes
+    rate_low_hz: 0.5            # search bracket; must straddle the target output rate
+    rate_high_hz: 60.0
+    tolerance_hz: 0.05          # accept when the measured output is this close to target
+    max_iterations: 40
+    n_trials: 5                 # independent replicates averaged per candidate rate, so
+      # Monte Carlo noise cannot violate bisection's monotonicity assumption
   calibration_check:            # single-spike PSP verification harness (Phase 1 self-check),
     dt_ms: 0.01                 # distinct from the production sweep's dt/length above --
     duration_ms: 50.0           # this only needs to resolve one ~7ms-peaked PSP cleanly
@@ -97,7 +129,11 @@ binary_network:
     length_tau: 200000
   fig2g_subsample_neurons: 1000  # random E-neuron subset at N=8192 for the r histogram (~500k pairs)
   ccg:
-    max_lag_ms: 50.0            # Fig. 2E; bin = tau_ms / sampling_rate_lagged (native, no downsampling)
+    max_lag_ms: 50.0            # lag range COMPUTED; bin = tau_ms / sampling_rate_lagged
+      # (native, no downsampling)
+    display_lag_ms: 10.0        # lag range PLOTTED. Read off the published Fig. 2E, whose
+      # x-axis spans about -10 to +10 ms. Computing wider costs nothing and lets the tails
+      # be inspected; the panel is drawn to the paper's range.
   burn_in_tau: 10               # discarded before recording (session 2026-09-11: random
     # Bernoulli(0.5) initial state per neuron, then burn_in_tau*3N ticks discarded)
   exploratory:                  # session 2026-09-11 grilling Q11: fast validation pass,
@@ -106,7 +142,13 @@ binary_network:
     length_tau: 5000
   simulation:
     length_tau: 200000
-    n_realisations: 50         # Fig. 2C (pending Q13); 10 for Fig. 2F
+    n_realisations: 50         # Fig. 2C's stated repeat count (SOM S-p.18).
+      # Fig. 2F is NOT reproduced: the published panel is a three-arrow cycle diagram
+      # ("Description of the asynchronous self-consistent solution"), with no curves in it.
+      # The SOM does say "Each dot (curve) in Fig. 2C (2F) is the average over 50 (10)
+      # simulations", so the two sources disagree -- most likely a leftover from a draft
+      # where panel F was plotted. Documented in docs/paper/06-figure-protocols.md rather
+      # than silently resolved either way.
   robustness:                  # Fig. S4 sweep
     lambda_E: [1.0, 2.0]       # scales j_EE and j_IE together
     tau_I: [1.0, 2.0]          # relative to tau_E = 1
@@ -165,6 +207,21 @@ spiking_network:
     dt_ms: 0.05
     length_s: 200.0            # 5000 s for the Fig. S6 characterisation run
     n_networks: 10
+  panels:                       # Fig. 3A/3B's single-network run (block3.panels)
+    length_s: 5000.0            # Fig. S6: "All data comes from a single network simulated
+      # for 5000 s. All parameters as in Fig. 3 of the main text." Fig. 3's own caption
+      # states no length. 200s is NOT enough for 3B (found 2026-09-30): the grey histogram's
+      # width is pure estimator noise -- sigma_r for independent 1Hz trains at T=50ms is
+      # 0.0128 at 200s vs 0.0026 at 5000s, on an axis spanning +-0.05 -- so at 200s the
+      # surrogate is as wide as the measured histogram and the panel's claim vanishes.
+      # r_bar itself is fine at 200s; sigma_r is not. Fig. 3A's raster needs only a window
+      # of this run, so the same run serves both panels.
+    max_rate_matrix_gb: 4.0     # NOT a paper value -- a guard, sized against panels.slurm's
+      # --mem. eval.pairwise_correlations stacks an (r_bar_sample_size, n_windows) float64
+      # matrix, which is n*(length_s*1000 - burn_in_ms)/bin_dt_ms*8 bytes: 1.6GB at 200 s
+      # but 40GB at 5000 s, and numpy.corrcoef then adds a centred copy on top. panels.py
+      # checks this BEFORE building the network, because the failure would otherwise land
+      # after the multi-day run with nothing written.
   r_bar_sample_size: 1000       # session 2026-09-16/17 grilling: r_bar estimated over all
     # pairs among this many randomly-sampled E neurons, mirroring Fig. S6's own "1000 E and
     # 1000 I cells" convention -- not all N_E pairs (~8M, too many) and not an ad hoc sample.
@@ -176,6 +233,52 @@ spiking_network:
     length_s: 5.0
     n_networks: 1
     brian2_device: runtime      # standalone deferred until a measured need (ADR 0001/0003 pattern)
+  fig3a:                        # Fig. 3A caption (main text p.590)
+    raster_neurons: 500         # "Raster (top) of 500 E (green) and I (red) neurons
+      # sorted by rate". AMBIGUITY: the caption does not say whether this is 500 total
+      # or 500 of each. Read here as 500 TOTAL, sampled from E and I in proportion to
+      # their population sizes (so 400 E / 100 I at the paper's 4:1 ratio).
+    tracking_bin_ms: 3.0        # "transformed to z scores, bin size 3 ms"
+  fig3b:                        # Fig. 3B caption + Fig. S6
+    jitter_ms: 500.0            # "jitter +/- 500 ms"; Fig. S6 states the distribution:
+      # "uniform random shift in [-0.5, +0.5] s per spike". Count window T comes from
+      # analysis.count_window_T_ms (50 ms), which the caption also states.
+    n_surrogate_sets: 1         # the grey histogram is one jittered surrogate of the
+      # same pairs as the black one -- not the N_jitt=500 SIGNIFICANCE test of S-Eq(41),
+      # which is a different procedure applied to in vivo data.
+  fig3cd:                       # SOM S-p.21, the intracellular cancellation experiment
+    i_app_nA: [-1.3, -0.65, -0.1, 0.0, 0.2, 0.74, 1.48, 3.7]
+      # VERBATIM from S-p.21: "The current levels were Iapp = -1.3, -0.65, . . . , -0.1,
+      # 0, 0.2, 0.74, 1.48, . . . 3.7 nA". The two "..." gaps are NOT stated anywhere in
+      # the paper or the SOM, and the printed values fit neither an arithmetic nor a
+      # geometric series, so they cannot be reconstructed. Only the eight explicitly
+      # printed levels are listed here. UNRESOLVED -- see src/block3/README.md.
+    length_s: 50.0              # "50 s of simulated time"
+    n_networks: 10              # "450 cell pairs from ten different networks"
+    n_recorded_cells_per_condition: 10
+      # DERIVED, NOT STATED -- verify before trusting Fig. 3C/D's pair counts. Holding
+      # 10 cells at each I_app level per network reproduces both of the paper's stated
+      # pair counts exactly: same-condition pairs = C(10,2) = 45 per network x 10
+      # networks = 450 ("an average over 450 cell pairs from ten different networks"),
+      # and cross-condition (EPSP-IPSP) pairs = 10 x 10 = 100 per network x 10 networks
+      # = 1000 ("except the EPSP-IPSP condition ... the number of pairs was 1000").
+      # No other simple scheme reproduces both numbers. Recorded as docs/adr/0006.
+    epsp_condition_nA: -1.3     # most hyperpolarising level: pushes V toward V_rev^I so
+      # the trace is EPSP-dominated (Fig. 3C green). INFERRED as the extreme of the swept
+      # list -- the SOM states the intent ("adjusted to isolate the EPSPs and IPSPs in
+      # their respective reversal potentials") but not which level maps to which curve.
+    ipsp_condition_nA: 3.7      # most depolarising level: V toward V_rev^E, so the trace
+      # is IPSP-dominated (Fig. 3C red). Same inference as above.
+    rest_condition_nA: 0.0      # "the black curve is from pairs at resting potential"
+    ccg_bin_ms: 1.0             # sampling interval for the membrane-potential CCG. NOT
+      # stated: the SOM says only "we computed cross-correlograms of the voltages" and gives
+      # no bin. Declared here rather than borrowed from analysis.bin_dt_ms or
+      # analysis.ccg.bin_dt_ms, both of which mean other things (the spike-train binning and
+      # the in vivo spike-CCG bin), so that one quantity has exactly one setting. 1 ms is
+      # far finer than the ~15 ms membrane time constant while keeping the recorded array
+      # and the 2*max_lag+1 correlations tractable; the integration step is unaffected.
+    ccg_max_lag_ms: 50.0        # lag range for the same CCG; the published Fig. 3C x-axis
+      # spans -50 to +50 ms.
   expected:                    # reproduction targets, not inputs
     rate_excitatory_hz: 1.0
     rate_inhibitory_hz: 3.6

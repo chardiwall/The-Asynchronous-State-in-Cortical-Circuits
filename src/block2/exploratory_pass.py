@@ -11,6 +11,7 @@ import time
 
 import numpy as np
 
+from block2.connectivity import couplings
 from block2.eval import population_averaged_correlation
 from block2.simulate import simulate
 from block2.theory import predicted_rates
@@ -26,7 +27,7 @@ CSV_FIELDS = [
 def run_one_size(n: int, config: dict) -> dict:
     net = config["binary_network"]
     exploratory = net["exploratory"]
-    j = {pair: net["couplings"][f"j_{pair}"] for pair in ("EE", "EI", "EX", "IE", "II", "IX")}
+    j = couplings(net)
 
     n_realisations = exploratory["n_realisations"]
     length_tau = exploratory["length_tau"]

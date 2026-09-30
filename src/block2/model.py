@@ -39,6 +39,12 @@ def tick(
     if population == "X":
         new_value = int(rng.random() < m_x)
     else:
+        # Strict `> 0`, i.e. Theta(0) = 0. This follows the SOM's algorithm prose (S-p.18:
+        # "if the synaptic current was LARGER THAN the firing threshold ... set to one, and
+        # otherwise ... zero") rather than S-Eq(5)'s Heaviside, whose value at 0 is a
+        # convention. Not merely theoretical: h == 0 exactly requires 5a - 10b + 5c = sqrt(n),
+        # which is reachable in binary floating point whenever sqrt(n) is an integer multiple
+        # of 5 -- n = 100 and n = 400, both exploratory sizes.
         new_value = int(afferent_current(state, weights, theta, population, i) > 0)
 
     state[population][i] = new_value

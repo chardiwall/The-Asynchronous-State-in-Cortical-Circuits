@@ -122,18 +122,18 @@ def simulate_pair(
         2, eqs, threshold="V>theta", reset="V=v_reset", refractory=t_ref, method="exact"
     )
     cells.V = [v_init_a_mV, v_init_b_mV] * b2.mV
-    # lastspike/not_refractory are Brian2's own refractory bookkeeping (auto-added for
-    # any NeuronGroup with a time-based `refractory=`). Seeding them from the previous
-    # chunk's final state -- rather than leaving Brian2's fresh-group defaults (lastspike
-    # far in the past, not_refractory=True) -- is what makes a spike whose refractory
-    # period straddles a chunk boundary carry through correctly: a cell still refractory
-    # at the boundary must ignore synaptic drive for the remaining t_ref in the next
-    # chunk too, exactly as it would have in one unchunked run.
+    # lastspike is Brian2's own refractory bookkeeping (auto-added for any NeuronGroup
+    # with a time-based `refractory=`). Seeding it from the previous chunk's final state --
+    # rather than leaving Brian2's fresh-group default of "far in the past" -- is what
+    # makes a spike whose refractory period straddles a chunk boundary carry through
+    # correctly: a cell still refractory at the boundary must ignore synaptic drive for
+    # the remaining t_ref in the next chunk too, exactly as in one unchunked run.
+    #
+    # `not_refractory` is deliberately NOT set alongside it. Brian2's state updater
+    # recomputes it from lastspike at the start of every step, before anything can read
+    # the value we would have written, so assigning it is dead code that only looks
+    # load-bearing. lastspike is the sole carrier.
     cells.lastspike = [lastspike_init_a_ms, lastspike_init_b_ms] * b2.ms
-    cells.not_refractory = [
-        (0.0 - lastspike_init_a_ms) >= t_ref_ms,
-        (0.0 - lastspike_init_b_ms) >= t_ref_ms,
-    ]
 
     state_mon = b2.StateMonitor(cells, "V", record=True)
     spike_mon = b2.SpikeMonitor(cells)

@@ -1,4 +1,4 @@
-"""Seam: calibrate_e_only_input_rate -- ambiguity 1 in docs/paper/01-postsynaptic-pair.md:
+"""Seam: calibrate_input_rate -- ambiguity 1 in docs/paper/01-postsynaptic-pair.md:
 the paper states 20Hz for the E+I condition but not the E-only rate; it must be found
 numerically so E-only output rate = 5Hz at r_in=0 (no closed form for LIF-under-Poisson
 firing rate). Bisection assumes output rate increases monotonically with input rate --
@@ -7,12 +7,12 @@ true for a purely excitatory drive on a LIF neuron.
 import numpy as np
 import pytest
 
-from block1.calibrate_rate import calibrate_e_only_input_rate
+from block1.calibrate_rate import calibrate_input_rate
 from block1.dataset import build_pair_inputs
 from block1.model import simulate_pair
 
 COMMON_KWARGS = dict(
-    n_e=250,
+    n_e=250, n_i=0,
     j_e_mV=3.0, j_i_mV=3.0,
     tau_m_ms=10.0, tau_s_ms=5.0, theta_mV=20.0, v_reset_mV=10.0, t_ref_ms=2.0,
     duration_ms=5000.0, dt_ms=0.05, jitter_tau_ms=5.0,
@@ -39,7 +39,7 @@ def _measure_output_rate_hz(rate_hz: float, seed: int) -> float:
 
 def test_calibrated_rate_produces_output_close_to_target():
     target_hz = 5.0
-    calibrated_rate_hz = calibrate_e_only_input_rate(
+    calibrated_rate_hz = calibrate_input_rate(
         target_output_hz=target_hz,
         rate_low_hz=1.0, rate_high_hz=20.0,
         tolerance_hz=1.0, max_iterations=12, n_trials=3,
@@ -56,7 +56,7 @@ def test_calibrated_rate_is_well_below_the_e_plus_i_rate():
     # Sanity check tied to the ambiguity itself: the E+I condition's 20Hz would drive
     # the E-only cell far above 5Hz (per the docs' own reasoning), so the calibrated
     # rate must land meaningfully below 20Hz.
-    calibrated_rate_hz = calibrate_e_only_input_rate(
+    calibrated_rate_hz = calibrate_input_rate(
         target_output_hz=5.0,
         rate_low_hz=1.0, rate_high_hz=20.0,
         tolerance_hz=1.0, max_iterations=12, n_trials=3,
@@ -71,7 +71,7 @@ def test_bounds_not_bracketing_target_raises():
     # actually bracket the target must fail loudly, not silently converge to one edge
     # and return it as if calibration succeeded.
     with pytest.raises(ValueError):
-        calibrate_e_only_input_rate(
+        calibrate_input_rate(
             target_output_hz=5.0,
             rate_low_hz=0.01, rate_high_hz=0.05,  # both far too low to reach 5Hz
             tolerance_hz=0.5, max_iterations=5, n_trials=2,
@@ -85,7 +85,7 @@ def test_exhausting_iterations_without_converging_raises():
     # meeting tolerance must fail loudly, not silently return an unconverged mid as if
     # it were a successful calibration.
     with pytest.raises(ValueError):
-        calibrate_e_only_input_rate(
+        calibrate_input_rate(
             target_output_hz=5.0,
             rate_low_hz=1.0, rate_high_hz=20.0,
             tolerance_hz=1e-6, max_iterations=1, n_trials=1,  # impossible to converge
@@ -102,7 +102,7 @@ def test_averaging_multiple_trials_reduces_single_run_noise_sensitivity():
     # rate, reducing that noise by ~sqrt(n_trials). Just checks it still converges
     # sensibly with averaging enabled -- the noise-reduction itself isn't directly
     # observable in a single calibration run, but this exercises the averaging path.
-    calibrated_rate_hz = calibrate_e_only_input_rate(
+    calibrated_rate_hz = calibrate_input_rate(
         target_output_hz=5.0,
         rate_low_hz=1.0, rate_high_hz=20.0,
         tolerance_hz=1.0, max_iterations=12, n_trials=3,

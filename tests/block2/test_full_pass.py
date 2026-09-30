@@ -1,7 +1,7 @@
 """Seams: build_full_pass_grid -- maps a flat Slurm array task index to its
 (N, realisation) job, one entry per repeat per size (config.yaml's
 binary_network.full_pass); run_one_task -- runs ONE realisation via the tested
-simulate_fast and returns its summary row (rates + the five S-Eq 28-29
+simulate_fast_one and returns its summary row (rates + the five S-Eq 28-29
 correlations), the per-task unit of work each Slurm array task does.
 """
 from block2.full_pass import build_full_pass_grid, run_one_task

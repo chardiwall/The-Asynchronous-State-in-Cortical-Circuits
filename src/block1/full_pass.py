@@ -1,6 +1,6 @@
 """Block 1's main script: the paper-accurate full pass (L=10,000s) across all three Fig. 1
-sweeps -- 1B's p (E-only, r_in=0), 1E's r_in for E-only and for E+I. All 15 points are
-batched into ONE Brian2 simulation per time chunk (batched_model.simulate_pairs_batch_chunked)
+sweeps -- 1B's p (E-only, r_in=0), 1E's r_in for E-only and for E+I. All 21 sweep points are
+batched into ONE Brian2 simulation per time chunk (chunking.simulate_pairs_batch_chunked)
 instead of one Brian2 run per point: the points don't couple to each other, so batching
 is exact, and it turns the previous run's dominant cost (many separate per-point Brian2
 b2.run() calls, see PROGRESS.md's Phase 3.6 benchmark) into one amortized cost, giving a
@@ -25,7 +25,7 @@ import time
 import numpy as np
 
 from analysis import StreamingCorrelation, spike_count_correlation
-from block1.batched_model import simulate_pairs_batch_chunked
+from block1.chunking import simulate_pairs_batch_chunked
 from block1.calibration import calibrate_synaptic_weights
 from block1.dataset import build_pair_inputs
 from config import load_config
@@ -63,9 +63,21 @@ def build_sweep_points(config: dict) -> list[dict]:
              rate_hz=inputs_cfg["rate_e_only_calibrated_hz"])
         for r_in in sweeps["r_in_grid"]
     ]
+    # The E+I input rate is calibrated, not the paper's stated 20 Hz: measured, 20 Hz gives
+    # ~12 Hz output, not the 5 Hz the SOM says it produces (config.yaml records the full
+    # finding). Raise rather than silently fall back, which would put Fig. 1E's two curves
+    # at different operating points -- the exact thing the recalibration exists to prevent.
+    rate_e_plus_i = inputs_cfg["rate_e_plus_i_calibrated_hz"]
+    if rate_e_plus_i is None:
+        raise ValueError(
+            "config.yaml: pair_model.inputs.rate_e_plus_i_calibrated_hz is null. Derive it "
+            "first with `python -m block1.calibrate_rate e_plus_i`, then paste the value in. "
+            "Falling back to the paper's stated 20 Hz would put Fig. 1E's E-only and E+I "
+            "curves at ~5 Hz and ~12 Hz output respectively."
+        )
     points += [
         dict(phase="fig1e_e_plus_i", p=p_fixed, r_in=r_in, n_e=n_e, n_i=n_i,
-             rate_hz=inputs_cfg["rate_correlated_sweep_hz"])
+             rate_hz=rate_e_plus_i)
         for r_in in sweeps["r_in_grid"]
     ]
     return points

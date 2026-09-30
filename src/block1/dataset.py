@@ -80,11 +80,12 @@ def build_pair_inputs(
     jitter_tau_ms: float,
     rng: np.random.Generator,
 ) -> PairInputs:
-    """p*N of each population's inputs are literally shared verbatim between the two
-    cells; the remaining (1-p)N are drawn from ONE shared mother-train pool spanning both
-    populations and both cells (researcher-confirmed, 2026-09-10 -- see PROGRESS.md for
-    the derivation showing this, not per-index-pair independent mothers, is required to
-    reproduce M-Eq(1)'s N*r_in amplification).
+    """p*N of each population's inputs are literally shared verbatim between the two cells;
+    the remaining (1-p)N differ between them. ALL of them -- shared and unshared alike --
+    are children of ONE mother train spanning both populations and both cells, so every
+    pair among a cell's inputs is correlated at r_in, which is what reproduces M-Eq(1)'s
+    N*r_in amplification (a single pool, not per-index-pair independent mothers;
+    researcher-confirmed 2026-09-10, see PROGRESS.md for the derivation).
     """
     if not (0.0 <= p <= 1.0):
         raise ValueError(f"p must be in [0, 1] (it's a shared fraction), got {p}")
@@ -94,16 +95,24 @@ def build_pair_inputs(
     n_pool_e = n_e - n_shared_e
     n_pool_i = n_i - n_shared_i
 
-    shared_e = [_poisson_process(rate_hz, duration_ms, rng) for _ in range(n_shared_e)]
-    shared_i = [_poisson_process(rate_hz, duration_ms, rng) for _ in range(n_shared_i)]
-
+    # EVERY train comes from the one mother pool, shared and pooled alike -- SOM S-p.20:
+    # "Each pre-synaptic train was a thinned version of the mother train". Drawing the
+    # p*N shared trains as independent Poisson processes instead (as this did until
+    # 2026-09-30) leaves them uncorrelated with the pool and with each other, which biases
+    # the current correlation low by ~10% at r_in=0.01 and ~5.5% at r_in=0.025 -- the
+    # latter being the marked circle of Figs. 1C and 1F. The shared trains are drawn ONCE
+    # and handed to both cells, which is what makes them literally shared.
     pool = mother_train_pool(
-        rate_hz, r_in, 2 * (n_pool_e + n_pool_i), duration_ms, jitter_tau_ms, rng
+        rate_hz, r_in, n_shared_e + n_shared_i + 2 * (n_pool_e + n_pool_i),
+        duration_ms, jitter_tau_ms, rng,
     )
-    pool_e_a = pool[0:n_pool_e]
-    pool_e_b = pool[n_pool_e : 2 * n_pool_e]
-    pool_i_a = pool[2 * n_pool_e : 2 * n_pool_e + n_pool_i]
-    pool_i_b = pool[2 * n_pool_e + n_pool_i : 2 * n_pool_e + 2 * n_pool_i]
+    cut = 0
+    shared_e, cut = pool[cut:cut + n_shared_e], cut + n_shared_e
+    shared_i, cut = pool[cut:cut + n_shared_i], cut + n_shared_i
+    pool_e_a, cut = pool[cut:cut + n_pool_e], cut + n_pool_e
+    pool_e_b, cut = pool[cut:cut + n_pool_e], cut + n_pool_e
+    pool_i_a, cut = pool[cut:cut + n_pool_i], cut + n_pool_i
+    pool_i_b = pool[cut:cut + n_pool_i]
 
     return PairInputs(
         e_spikes_a=_pool(shared_e + pool_e_a),

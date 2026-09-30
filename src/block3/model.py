@@ -11,6 +11,15 @@ V_rev^X=V_rev^E classifies X as excitatory-type (docs/paper/03 Ambiguity).
 
 EE and II synapses exclude self-connections (i==j), matching block 2's binary-network
 convention for within-population pairs -- a neuron does not synapse onto itself.
+
+Integration-order caveat (verified against Brian2 2.10.1's scheduler, not assumed): the
+paper specifies second-order Runge-Kutta, and method="rk2" is what every group here asks
+for, but Brian2's (summed) mechanism runs the summed-variable updaters at order-1 and the
+neuron's state updater at order 0 within each timestep. So I_E/I_I/I_X are computed from
+the START-of-step V and then held constant across the step: rk2 applies to the leak plus
+those frozen currents, while the conductance term -g*s*(V - V_rev) is effectively Euler.
+This is inherent to (summed), not a choice made here, and at dt=0.05ms against tau_r=1ms
+it is the dominant discretisation error.
 """
 from dataclasses import dataclass
 
@@ -29,6 +38,7 @@ I_E : amp
 I_I : amp
 I_X : amp
 I_app : amp
+theta : volt (constant)
 """
 
 
@@ -97,7 +107,11 @@ def build_network(params: dict, rng: np.random.Generator) -> Block3Network:
 
     # Explicit namespace (see _build_synapse's comment: construction and run() happen in
     # different frames, so Brian2's implicit frame-capture default would fail at run time).
-    neuron_namespace = {"g_L": g_L, "C_m": C_m, "V_L": V_L, "theta": theta, "v_reset": v_reset}
+    # theta is a per-neuron PARAMETER, not a namespace constant, so Fig. 3C-D can disable
+    # the spiking mechanism in the recorded pair (S-p.21) by raising only those cells'
+    # threshold out of reach. Every neuron is set to the config value below, so a normal
+    # run is numerically identical to a single shared threshold.
+    neuron_namespace = {"g_L": g_L, "C_m": C_m, "V_L": V_L, "v_reset": v_reset}
     group_e = b2.NeuronGroup(n_e, NEURON_EQS, threshold="V>theta", reset="V=v_reset",
                               refractory=t_ref_e, namespace=neuron_namespace,
                               method="rk2", name="group_e")
@@ -107,6 +121,7 @@ def build_network(params: dict, rng: np.random.Generator) -> Block3Network:
     for group in (group_e, group_i):
         group.V = V_L
         group.I_app = 0 * b2.nA
+        group.theta = theta
 
     group_x = b2.PoissonGroup(
         n_x, rates=params["external_input"]["rate_hz"] * b2.Hz, name="group_x"

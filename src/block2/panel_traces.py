@@ -6,8 +6,9 @@ primitives; only what gets recorded at each sample differs.
 import numpy as np
 from numba import njit
 
-from block2.connectivity_stacked import build_weights_stacked
+from block2.connectivity import build_weights_stacked
 from block2.fast_model import _tick_jit
+from block2.simulate import _ticks_per_sample
 
 
 @njit
@@ -105,7 +106,7 @@ def population_mean_trace(n, p, j, m_x, theta, window_tau, sampling_rate, burn_i
     ticks_per_tau = 3 * n
     return _run_jit_population_mean(
         weights_E, weights_I, initial_state, theta, m_x, burn_in_tau * ticks_per_tau,
-        window_tau * sampling_rate, ticks_per_tau // sampling_rate, seed)
+        window_tau * sampling_rate, _ticks_per_sample(n, sampling_rate), seed)
 
 
 def subsample_state_trace(n, p, j, m_x, theta, window_tau, sampling_rate, burn_in_tau, seed, subsample_size):
@@ -114,7 +115,7 @@ def subsample_state_trace(n, p, j, m_x, theta, window_tau, sampling_rate, burn_i
     subsample_E = rng.choice(n, size=min(subsample_size, n), replace=False).astype(np.int64)
     return _run_jit_subsample_state(
         weights_E, weights_I, initial_state, theta, m_x, burn_in_tau * ticks_per_tau,
-        window_tau * sampling_rate, ticks_per_tau // sampling_rate, subsample_E, seed)
+        window_tau * sampling_rate, _ticks_per_sample(n, sampling_rate), subsample_E, seed)
 
 
 def single_cell_components_trace(n, p, j, m_x, theta, window_tau, sampling_rate, burn_in_tau, seed, cell_index):
@@ -122,4 +123,4 @@ def single_cell_components_trace(n, p, j, m_x, theta, window_tau, sampling_rate,
     ticks_per_tau = 3 * n
     return _run_jit_cell_components(
         weights_E, weights_I, initial_state, theta, m_x, burn_in_tau * ticks_per_tau,
-        window_tau * sampling_rate, ticks_per_tau // sampling_rate, cell_index, seed)
+        window_tau * sampling_rate, _ticks_per_sample(n, sampling_rate), cell_index, seed)
