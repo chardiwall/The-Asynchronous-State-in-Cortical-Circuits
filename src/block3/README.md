@@ -29,21 +29,24 @@ These are recorded here because they are inferences, not transcriptions.
    × 10 networks = 1000. No other simple scheme gives both. See `docs/adr/0006`. If you
    reject it, only `fig3cd.n_recorded_cells_per_condition` and the pair enumeration change.
 
-3. **Fig. 3B's run length is now 5000 s, not 200 s** (fixed 2026-09-30; `panels.length_s`).
-   The panel's claim is that the measured histogram is wide *relative to its jittered null*,
-   and the null's width is pure estimator noise: for independent 1 Hz trains at `T = 50 ms`,
-   σ_r is 0.0128 at 200 s against 0.0026 at 5000 s, on an axis spanning ±0.05. At 200 s the
-   grey histogram was about as wide as the black one and the panel said nothing. Fig. S6
-   states 5000 s for the single-network protocol; Fig. 3's own caption states no length.
-   `r̄` was always fine at 200 s; only `σ_r` was not.
+3. **Fig. 3B runs at 1000 s, not the 5000 s the supplement states.** A deliberate,
+   documented deviation (decided 2026-10-01, GitHub issue #8). The panel's claim is that the
+   measured histogram is wide *relative to its jittered null*, and the null's width is pure
+   estimator noise. Measured, for independent 1 Hz trains at the stated count window:
 
-   **But 5000 s is not currently runnable here.** 200 s measured 27h07m on this node, so
-   5000 s extrapolates to roughly **28 days** for a single job with no checkpointing. The
-   config and the Slurm script now state the correct protocol, but one of these has to give
-   before Fig. 3B can actually be produced: a faster code-generation path (`cpp_standalone`
-   was benchmarked and gave no speedup, so this means Brian2CUDA or Brian2GeNN), splitting
-   the run into resumable segments, or accepting a shorter length and the wider null that
-   comes with it. **Researcher's call — flagged, not decided.**
+   | run length | null width | rate matrix | wall clock |
+   |---|---|---|---|
+   | 200 s | 0.0114 | 1.6 GB | 27 h |
+   | **1000 s (configured)** | **0.0056** | **8 GB** | **135 h** |
+   | 5000 s (the supplement's) | 0.0027 | 40 GB | ~28 days |
+
+   On an axis spanning ±0.05, the 200 s null is as wide as the measurement and the panel
+   says nothing. At 1000 s the comparison is real, but the separation is visibly weaker than
+   the published figure's. The population-averaged correlation itself averages over ~500k
+   pairs and is unaffected at any of these lengths; only the spread is.
+
+   Raising `panels.length_s` back to 5000 makes `panels.py` refuse before building the
+   network, by design, rather than fail after days with nothing written.
 
 A fourth, smaller one: **which `I_app` level is the EPSP curve and which the IPSP curve is
 inferred** from the extremes of the swept list. The SOM states the intent ("adjusted to

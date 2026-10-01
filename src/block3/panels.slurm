@@ -3,22 +3,25 @@
 # the 3 ms tracking curves and the measured/jittered correlation histograms).
 #
 # Not an array job: 3A is one illustrative network and 3B's histogram is over pairs within
-# that network, not over networks. Length comes from spiking_network.panels.length_s, which
-# is 5000 s (Fig. S6's stated single-network protocol) because Fig. 3B's jittered null is
-# otherwise as wide as the measurement -- see src/block3/README.md.
+# that network, not over networks. Length comes from spiking_network.panels.length_s.
 #
-# 200 s measured 27h07m wall and 3.85GB peak RSS on this node, so 5000 s extrapolates to
-# roughly 28 DAYS. That is far past any sensible --time, so this job is checkpoint-free and
-# will need either splitting or a faster codegen path before it can actually run; the
-# --time below is the cluster maximum, not a sufficient budget. Treat this script as the
-# correct specification of the run, not as a submittable job yet.
+# 1000 s, NOT the 5000 s Fig. S6 states -- a deliberate, documented deviation (GitHub #8).
+# Measured 27.1 h per 200 s on this node, so 1000 s is ~135 h, inside the 168 h limit below
+# with ~24% margin; 5000 s would be ~28 days uncheckpointed. The cost is that Fig. 3B's
+# jittered null is 0.0056 wide rather than 0.0027, so the separation from the measured
+# histogram is real but weaker than the published panel's. config.yaml has the numbers.
+#
+# --mem=24G: the rate matrix is 8GB at this length and numpy.corrcoef adds a centred copy,
+# on top of the ~4GB network state measured for the 200 s run. panels.py refuses to start
+# if the matrix would exceed panels.max_rate_matrix_gb, so a misconfiguration fails in
+# seconds rather than after five days.
 #   sbatch src/block3/panels.slurm
 #SBATCH --job-name=block3_panels
 #SBATCH --partition=gpu
 #SBATCH --nodelist=spark-c3d8
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=8G
+#SBATCH --mem=24G
 #SBATCH --time=168:00:00
 #SBATCH --output=artifacts/block3_panels/slurm.out
 #SBATCH --container-image=ubuntu:24.04
