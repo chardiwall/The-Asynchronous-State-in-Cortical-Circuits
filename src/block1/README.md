@@ -6,8 +6,8 @@ partly-shared, partly-correlated Poisson input. This is the smallest scale at wh
 paper's central mechanism appears — weak input correlation is hugely amplified by summing
 over many inputs, and matched inhibition cancels that amplification.
 
-**Status: complete.** All four panels have been produced; `artifacts/` holds the metrics
-and figures written by the last run.
+**Status: complete.** All four panels have been produced. Running the commands below
+regenerates them into `artifacts/`, which is not tracked -- a fresh clone has no results.
 
 ## Run it
 
@@ -70,7 +70,8 @@ SOM S-p.19. Changing any of them means you are no longer reproducing the paper.
 `inputs.rate_e_only_calibrated_hz` (`4.04297` Hz) is **not** from the paper. The paper
 states 20 Hz for the E+I condition but never states the E-only input rate. It is derived
 by bisection so that the E-only cell fires at 5 Hz output when `r_in = 0`, which is the
-condition the paper's Fig. 1E curve implies. `calibrate_rate.py` holds that derivation.
+condition the paper's Fig. 1E curve implies. `calibration.py` holds that derivation,
+run as `python -m block1.run calibrate e_only`.
 
 If you change `n_excitatory`, `tau_m_ms`, `epsp_peak_mV`, or the threshold, **this value is
 stale** and must be re-derived before the E-only curve means anything.

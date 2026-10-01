@@ -8,7 +8,9 @@
 seed: 1234                     # sets random, numpy and framework RNGs at script startup
 
 paths:
-  artifacts: artifacts         # the single output location: metrics, logs, figures
+  artifacts: artifacts         # the single output location: metrics, logs, figures.
+    # DECLARATIVE ONLY -- the run scripts write "artifacts/..." directly; editing this key
+    # does not redirect them. Wire it through before relying on it.
 
 logging:
   metrics_file: artifacts/metrics.jsonl
@@ -37,7 +39,7 @@ pair_model:
       # UNUSED for Fig. 1E as of 2026-09-30 -- see rate_e_plus_i_calibrated_hz below. Kept
       # because it is what the paper says, so the discrepancy stays visible.
     rate_e_plus_i_calibrated_hz: 15.625  # DERIVED 2026-10-01 by bisection
-      # (block1.calibrate_rate e_plus_i, settings in pair_model.calibration_rate below:
+      # (block1.run calibrate e_plus_i, settings in pair_model.calibration_rate below:
       # 5 trials x 120 s per candidate, tolerance 0.18 Hz against a 0.09 Hz standard error).
       # Resolves ambiguity 3 (found 2026-09-30): the SOM states "The
       # input firing rate was set to 20 spikes/s TO PRODUCE AN OUTPUT RATE OF 5 spikes/s
@@ -53,7 +55,7 @@ pair_model:
       # operating point, not a free parameter.
     rate_e_only_calibrated_hz: 4.04297   # Fig. 1E E-only curve -- resolves ambiguity 1
       # (SOM S-p.19-20): the paper's 20Hz is E+I-only; the E-only rate
-      # isn't stated, so it's calibrated by bisection (block1.calibrate_rate) to give 5Hz
+      # isn't stated, so it's calibrated by bisection (block1.run calibrate) to give 5Hz
       # output at r_in=0, averaging n_trials=5 independent replicates per candidate rate
       # (a code-review fix: the original single-sample-per-step version could violate
       # bisection's monotonicity assumption under simulation noise). Re-derived 2026-09-10
@@ -83,10 +85,10 @@ pair_model:
     dt_ms: 0.05
     length_s: 10000.0
     chunk_duration_s: 200.0  # block1.run sweep: bounded per-chunk window for the paper-
-      # accurate full pass (both input generation and simulation are chunked at this scale
-      # at this scale). block1.batched_model batches all 15 sweep points into one
-      # simulation, so per-chunk arrays are 15x wider than the original per-point design
-      # this value was first set for.
+      # accurate full pass (both input generation and simulation are chunked at this
+      # scale). lib.brian_batch batches all 21 sweep points into one simulation, so
+      # per-chunk arrays are 21x wider than the original per-point design this value was
+      # first set for.
       #
       # MEMORY/RUNTIME TRADE ONLY -- chunking is mathematically exact (the correlations are
       # accumulated by analysis.StreamingCorrelation), so this never affects a result. Size
@@ -95,7 +97,7 @@ pair_model:
       # which fits the DGX's 121GB but not a 30GB workstation. Lowered to 200s (~2.7GB) on
       # 2026-10-01 when the grid widened from 15 points to 21 and the run moved local.
       # Raise it again on the DGX if the per-chunk overhead starts to matter.
-  calibration_rate:             # bisection settings for block1.calibrate_rate. NOT paper
+  calibration_rate:             # bisection settings for block1.run calibrate. NOT paper
     # values -- search parameters for resolving the two input-rate ambiguities. Sized from
     # a measurement, not guessed: an output-rate estimate is a noisy Monte Carlo quantity,
     # so the tolerance MUST sit above its standard error or bisection makes its bracket
@@ -209,9 +211,14 @@ spiking_network:
     g_II: 40.0
     g_EX: 5.4
     g_IX: 5.4
-    heterogeneity_std_fraction: 0.5   # g ~ Gaussian(mean, 0.5*mean); negative draws are
-      # resampled from a shifted Gaussian -- a negative g would flip a synapse's sign and
-      # break Dale's law, and naive discarding would bias the realised mean by +2.8%
+    heterogeneity_std_fraction: 0.5   # the REALISED per-synapse moments the SOM states:
+      # mean g^ab and std. dev. 0.5*g^ab. Achieved by drawing from a CORRECTED Gaussian --
+      # shifted down AND widened, (0.9486*g, 0.5490*g) at this value, solved numerically
+      # in block3.connectivity._truncated_normal_parameters -- then rejecting negative
+      # draws, so that the truncated result carries the stated moments. A negative g would
+      # flip a synapse's sign and break Dale's law. Drawing from N(g, 0.5g) and discarding
+      # negatives instead biases the realised mean to 1.0276*g (+2.8%); rescaling accepted
+      # samples fixes the mean but leaves the spread 8% low.
   synapse:                     # difference of exponentials
     tau_rise_ms: 1.0
     tau_decay_ms: 5.0
@@ -230,7 +237,7 @@ spiking_network:
     dt_ms: 0.05
     length_s: 200.0            # 5000 s for the Fig. S6 characterisation run
     n_networks: 10
-  panels:                       # Fig. 3A/3B's single-network run (block3.panels)
+  panels:                       # Fig. 3A/3B's single-network run (block3.run panels)
     length_s: 1000.0            # DELIBERATE DEVIATION from the paper, decided 2026-10-01.
       # Fig. S6 states 5000 s for the single-network protocol ("All data comes from a single
       # network simulated for 5000 s. All parameters as in Fig. 3 of the main text");
@@ -248,7 +255,7 @@ spiking_network:
       # ~500k pairs and is unaffected at any of these lengths; only sigma_r is.
       #
       # Raise this to 5000 and the guard below will refuse -- by design. See GitHub #8.
-    max_rate_matrix_gb: 10.0    # NOT a paper value -- a guard, sized against panels.slurm's
+    max_rate_matrix_gb: 10.0    # NOT a paper value -- a guard, sized against block3_panels.slurm's
       # --mem. block3.measure.pairwise_correlations stacks an (r_bar_sample_size, n_windows) float64
       # matrix, n*(length_s*1000 - burn_in_ms)/bin_dt_ms*8 bytes: 1.6GB at 200 s, 8GB at
       # 1000 s, 40GB at 5000 s, and numpy.corrcoef adds a centred copy on top.
@@ -336,7 +343,7 @@ analysis:
 # ---------------------------------------------------------------------------
 # Qualitative sweep validation (Block 1 Phases 5-6: does c/r_out grow with p/r_in?)
 # Not from the paper -- a project-specific noise-tolerance threshold for
-# block1.eval.check_increasing_trend, a correlation-based proxy for "grows with x".
+# lib.checks.check_increasing_trend, a correlation-based proxy for "grows with x".
 # ---------------------------------------------------------------------------
 qualitative_checks:
   increasing_trend_min_correlation: 0.8

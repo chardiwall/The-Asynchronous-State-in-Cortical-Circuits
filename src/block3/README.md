@@ -45,8 +45,9 @@ These are recorded here because they are inferences, not transcriptions.
    the published figure's. The population-averaged correlation itself averages over ~500k
    pairs and is unaffected at any of these lengths; only the spread is.
 
-   Raising `panels.length_s` back to 5000 makes `panels.py` refuse before building the
-   network, by design, rather than fail after days with nothing written.
+   Raising `panels.length_s` back to 5000 makes `block3.run panels` refuse before building
+   the network (the guard is `figures_ab.check_rate_matrix_fits`), by design, rather than
+   fail after days with nothing written.
 
 A fourth, smaller one: **which `I_app` level is the EPSP curve and which the IPSP curve is
 inferred** from the extremes of the swept list. The SOM states the intent ("adjusted to

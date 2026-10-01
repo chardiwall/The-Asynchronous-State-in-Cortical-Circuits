@@ -135,7 +135,7 @@ Cluster scripts live in `slurm/`.
 
 This block previously computed the wrong quantity for `c_EE`, `c_II` and `c_EI`, and any
 `artifacts/block2_full_pass_current.csv` produced before 2026-09-30 is **invalid**. Delete it
-and rerun `full_pass_current.slurm`.
+and rerun `block2_sweep_current.slurm`.
 
 The main text (p.588): "Because the synaptic current to each cell consists of an excitatory
 and an inhibitory **component**, the average current correlation across cell pairs, `c`, can

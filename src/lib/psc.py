@@ -7,7 +7,7 @@ pooled spike times into dt-wide bins (counts k[n]) gives the exact recursion:
     s[n] = a*s[n-1] + k[n]
 
 a first-order IIR filter -- scipy.signal.lfilter(b=[1], a=[1,-a], k). This makes the same
-dt-grid assumption Brian2's own event timing implies, verified in test_current_trace.py
+dt-grid assumption Brian2's own event timing implies, verified in tests/lib/test_psc.py
 against an independent from-scratch reference implementation and (historically, before
 model.py's Phase 3.5 rework made it tautological) against Brian2's own SpikeGeneratorGroup
 mechanism.

@@ -86,7 +86,7 @@ def test_batch_points_are_independent():
 
 
 def test_batch_carry_forward_matches_chained_calls():
-    # Batched analogue of test_model_chunking.py's refractory-straddling regression:
+    # Batched analogue of test_chunking.py's refractory-straddling regression:
     # point 0 has a spike cascade whose refractory period straddles the chunk split;
     # point 1 is silent throughout. Chaining two batched chunks (2nd seeded from the
     # 1st's returned per-point final state) must equal one unchunked batched call.

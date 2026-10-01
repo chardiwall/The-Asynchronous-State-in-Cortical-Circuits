@@ -1,6 +1,6 @@
-"""Drives batched_model.simulate_pairs_batch repeatedly over a long run, carrying
+"""Drives brian_batch.simulate_pairs_batch repeatedly over a long run, carrying
 V / lastspike / synaptic-trace-filter state forward across time chunks. Separated from
-batched_model.py because the two answer different questions: that module simulates N
+brian_batch.py because the two answer different questions: that module simulates N
 pairs for ONE window, this one turns that into an arbitrarily long run without ever
 holding the whole trace in memory.
 """

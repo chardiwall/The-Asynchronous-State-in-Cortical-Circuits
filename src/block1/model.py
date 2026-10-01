@@ -36,12 +36,12 @@ class PairResult:
     i_syn_b_mV: np.ndarray
     spikes_a_ms: np.ndarray
     spikes_b_ms: np.ndarray
-    # Carry-forward state for chunked runs (block1.chunked): the final V of each cell,
+    # Carry-forward state for chunked runs (lib.chunking): the final V of each cell,
     # the final synaptic_trace filter state (zf) of each of the 4 (cell, population)
     # traces, and each cell's lastspike time (local to *this* chunk's t=0) so the next
     # chunk can reproduce Brian2's own refractory/reset bookkeeping exactly. Pass these
     # as the next chunk's v_init_*/zi_*/lastspike_init_* (lastspike shifted by this
-    # chunk's duration -- see block1.chunked) to continue seamlessly.
+    # chunk's duration -- see lib.chunking) to continue seamlessly.
     v_a_final_mV: float
     v_b_final_mV: float
     lastspike_a_final_ms: float

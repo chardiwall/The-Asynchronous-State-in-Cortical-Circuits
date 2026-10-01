@@ -5,7 +5,7 @@ Color code is the paper's own Fig. 2B legend, reused by 2C/2D/2E ("Color code as
 (B)/(C)"): E green, I red, X blue, Total black, and the mixed EI quantity orange.
 
 2B/2D/2E/2G read block2.panels' per-panel CSVs. Fig. 2C is different in kind
--- it reads the two aggregated full-pass CSVs -- so it lives in plot_fig2_sweep.py; running
+-- it reads the two aggregated full-pass CSVs -- so it lives in plot_sweep.py; running
 this module draws all five.
 
 Usage: python -m block2.plot
