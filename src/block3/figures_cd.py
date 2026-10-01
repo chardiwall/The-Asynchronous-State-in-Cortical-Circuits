@@ -14,23 +14,18 @@ a = the EPSP level and b = the IPSP level it gives Fig. 3C's gold curve (100 x 1
 docs/adr/0006 records why ten cells per condition, and why conditions are not all recorded
 in one run.
 
-Usage (one Slurm array task): python -m block3.vm_ccg <task_index>
-Usage (one explicit run):     python -m block3.vm_ccg <network_index> <i_app_a> <i_app_b>
-Usage (aggregate):            python -m block3.vm_ccg --aggregate
+Usage (one Slurm array task): python -m block3.figures_cd <task_index>
+Usage (one explicit run):     python -m block3.figures_cd <network_index> <i_app_a> <i_app_b>
+Usage (aggregate):            python -m block3.figures_cd --aggregate
 """
-import csv
-import glob
-import json
 import os
-import sys
 
 import brian2 as b2
 import numpy as np
 
 from analysis import lagged_correlation
-from block3.eval import recorded_pairs, sample_neuron_subset, signed_peak
+from block3.measure import recorded_pairs, sample_neuron_subset, signed_peak
 from block3.model import build_network
-from config import load_config
 
 RESULTS_DIR = "artifacts/block3_vm_ccg"
 UNREACHABLE_THRESHOLD_mV = 1e6  # far above any voltage this conductance-based model reaches
@@ -115,50 +110,37 @@ def run_one_task(network_index: int, i_app_a_nA: float, i_app_b_nA: float, confi
     return row
 
 
-def aggregate(results_dir: str = RESULTS_DIR, out_csv: str = "artifacts/block3_vm_ccg.csv") -> int:
-    """Per-task JSON rows -> one long-form CSV, one line per (task, pair group, lag), which
-    is what plot_fig3 reads for both 3C's curves and 3D's peak-vs-holding-potential points.
+def aggregate_vm_ccg(results_dir: str, out_csv: str) -> int:
+    """Per-task JSON -> one long-form CSV, a line per (task, pair group, lag). That is what
+    block3.plot reads for both 3C's curves and 3D's peak-versus-holding-potential points.
+
+    Not lib.tasks.aggregate_task_rows: that writes one line per task, and these rows each
+    carry a whole correlogram that has to be unrolled.
     """
+    import csv
+    import glob
+    import json
+
     rows = []
     for path in sorted(glob.glob(f"{results_dir}/task_*.json")):
         with open(path) as f:
             rows.append(json.load(f))
     rows.sort(key=lambda r: (r["i_app_a_nA"], r["i_app_b_nA"], r["network_index"]))
 
+    os.makedirs(os.path.dirname(out_csv) or ".", exist_ok=True)
     with open(out_csv, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["network_index", "i_app_a_nA", "i_app_b_nA", "group",
                          "holding_mV", "n_pairs", "peak", "lag_ms", "ccg"])
         for r in rows:
-            for group, holding in (("within_a", r["holding_a_mV"]), ("within_b", r["holding_b_mV"]),
+            for group, holding in (("within_a", r["holding_a_mV"]),
+                                    ("within_b", r["holding_b_mV"]),
                                     ("cross", 0.5 * (r["holding_a_mV"] + r["holding_b_mV"]))):
-                lags = (np.arange(len(r[f"ccg_{group}"])) - len(r[f"ccg_{group}"]) // 2) * r["bin_ms"]
-                for lag, value in zip(lags, r[f"ccg_{group}"]):
-                    writer.writerow([r["network_index"], r["i_app_a_nA"], r["i_app_b_nA"], group,
-                                     holding, r[f"n_pairs_{group}"], r[f"peak_{group}"], lag, value])
+                ccg = r[f"ccg_{group}"]
+                lags = (np.arange(len(ccg)) - len(ccg) // 2) * r["bin_ms"]
+                for lag, value in zip(lags, ccg):
+                    writer.writerow([r["network_index"], r["i_app_a_nA"], r["i_app_b_nA"],
+                                     group, holding, r[f"n_pairs_{group}"],
+                                     r[f"peak_{group}"], lag, value])
+    print(f"{out_csv}: {len(rows)} tasks")
     return len(rows)
-
-
-def main():
-    if sys.argv[1] == "--aggregate":
-        print(f"aggregated {aggregate()} tasks into artifacts/block3_vm_ccg.csv")
-        return
-
-    config = load_config("config.yaml")
-    if len(sys.argv) > 3:
-        network_index, i_app_a, i_app_b = int(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
-    else:
-        task = build_task_grid(config)[int(sys.argv[1])]
-        network_index = task["network_index"]
-        i_app_a, i_app_b = task["i_app_a_nA"], task["i_app_b_nA"]
-    row = run_one_task(network_index, i_app_a, i_app_b, config)
-    os.makedirs(RESULTS_DIR, exist_ok=True)
-    path = f"{RESULTS_DIR}/task_{network_index:02d}_{i_app_a}_{i_app_b}.json"
-    with open(path, "w") as f:
-        json.dump(row, f)
-    print(f"wrote {path}: peaks "
-          f"a={row['peak_within_a']:.4f} b={row['peak_within_b']:.4f} cross={row['peak_cross']:.4f}")
-
-
-if __name__ == "__main__":
-    main()

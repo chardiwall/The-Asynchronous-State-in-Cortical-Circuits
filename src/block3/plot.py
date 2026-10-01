@@ -1,10 +1,10 @@
 """Fig. 3's four panels.
 
-3A/3B read block3.panels' CSVs; 3C/3D read block3.vm_ccg --aggregate's CSV. Colours are
+3A/3B read block3.figures_ab' CSVs; 3C/3D read block3.figures_cd --aggregate's CSV. Colours are
 the paper's own Fig. 3 legend: E green, I red, X blue; 3C's EPSP condition green, IPSP
 red, the mixed EPSP-IPSP condition gold, and rest black.
 
-Usage: python -m block3.plot_fig3
+Usage: python -m block3.plot
 """
 import csv
 import os

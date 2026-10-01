@@ -4,7 +4,7 @@ own "1000 E and 1000 I cells" convention, all pairs among the subsample)."""
 import numpy as np
 
 from analysis import spike_count_correlation
-from block3.eval import population_averaged_pairwise_correlation, sample_neuron_subset
+from block3.measure import population_averaged_pairwise_correlation, sample_neuron_subset
 
 
 def test_subset_is_correct_size_and_within_range():

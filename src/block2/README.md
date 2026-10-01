@@ -16,7 +16,7 @@ All commands are from the **repo root** with `PYTHONPATH=src`.
 ### Step 1 — validate against the closed-form theory (local, minutes)
 
 ```bash
-PYTHONPATH=src .env/bin/python -m block2.run
+PYTHONPATH=src .env/bin/python -m block2.run explore
 ```
 
 Small `N`, short runs, checked against S-Eq(18)'s predicted rates and S-Eq(28–29)'s
@@ -41,25 +41,25 @@ sbatch --array=337-346%13 --mem=9G slurm/block2_sweep.slurm
 sbatch --mem=6G slurm/block2_sweep_current.slurm
 
 # Once BOTH jobs have fully finished:
-PYTHONPATH=src .env/bin/python -m block2.run --aggregate
-PYTHONPATH=src .env/bin/python -m block2.run --aggregate
+PYTHONPATH=src .env/bin/python -m block2.run aggregate
+PYTHONPATH=src .env/bin/python -m block2.run aggregate
 ```
 
 A single task can be run directly, which is how to test before submitting:
-`PYTHONPATH=src .env/bin/python -m block2.run 0`
+`PYTHONPATH=src .env/bin/python -m block2.run sweep 0`
 
 ### Step 3 — the illustrative panels (local, minutes)
 
 ```bash
 for panel in b d e g; do
-  PYTHONPATH=src .env/bin/python -m block2.panels $panel
+  PYTHONPATH=src .env/bin/python -m block2.run panels $panel
 done
 ```
 
 ### Step 4 — plot everything
 
 ```bash
-PYTHONPATH=src .env/bin/python -m block2.plot
+PYTHONPATH=src .env/bin/python -m block2.run plot
 ```
 
 Writes `fig2b/c/d/e/g.png` to `artifacts/block2_illustrative/`. 2C reads the two aggregated
@@ -119,19 +119,17 @@ process even after `del`, because glibc did not return it to the OS.
 
 | File | Role |
 |---|---|
-| `connectivity.py` | S-Eq(1) connectivity in two layouts, plus the `couplings` helper every entry point uses. `build_weights` for the reference path, `build_weights_stacked` for production |
-| `model.py` | `afferent_current` / `tick` — the pure-Python reference implementation of S-Eq(5–7)'s exact algorithm. **The correctness oracle** the JIT path is checked against |
-| `simulate.py` | Loops `model.tick` over realisations. Exploratory scale only |
-| `theory.py` | S-Eq(18)'s closed-form rate prediction, independent of the simulation |
-| `eval.py` | The correlation and CCG math every panel reuses |
-| `fast_model.py` | Numba-JIT'd production path: `simulate_fast_one`, `simulate_fast_current` |
-| `panel_traces.py` | Cheap single-realisation JIT recordings for the illustrative panels |
-| `exploratory_pass.py` | Step 1's theory-validation run |
-| `full_pass.py` + `.slurm` | Fig. 2C's `r̄` sweep, plus the task-dispatch and aggregation both sweeps share |
-| `full_pass_current.py` + `.slurm` | Fig. 2C's `c` sweep |
-| `illustrative_panels.py` | 2B/2D/2E/2G's raw CSVs |
-| `plot_fig2.py` | Panels 2B/2D/2E/2G, and the entry point that draws all five |
-| `plot_fig2_sweep.py` | Panel 2C — different in kind, it reads the two aggregated sweep CSVs |
+| `model.py` | The paper's binary network in one place: S-Eq(5-7)'s Glauber dynamics, S-Eq(18)'s closed-form rate prediction, and the pure-Python reference simulation they are checked against. **The correctness oracle** the JIT path is validated against |
+| `connectivity.py` | S-Eq(1) connectivity in two memory layouts, plus the couplings helper |
+| `measure.py` | The correlation, CCG and current-component decomposition every panel reuses |
+| `panels.py` | Raw data for the illustrative panels 2B/2D/2E/2G |
+| `run.py` | **The entry point.** `explore`, `sweep`, `current`, `aggregate`, `panels`, `plot` |
+| `plot.py` | Panels 2B, 2D, 2E, 2G |
+| `plot_sweep.py` | Panel 2C — different in kind, it reads the two aggregated sweep CSVs |
+
+Machinery lives in `src/lib`: the Numba-JIT'd production path (`glauber`, `glauber_panels`),
+the Slurm-array bookkeeping (`tasks`) and the shared plotting helpers (`plotting`).
+Cluster scripts live in `slurm/`.
 
 ## Fig. 2C's decomposition, corrected 2026-09-30
 

@@ -3,7 +3,7 @@
 in-process pool). Small N / short duration for test speed."""
 import numpy as np
 
-from block3.full_pass import run_one_task
+from block3.figures_ab import run_one_task
 
 SMALL_CONFIG = {
     "seed": 42,

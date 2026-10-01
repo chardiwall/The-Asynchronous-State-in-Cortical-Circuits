@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 
 from analysis import jitter_spike_times
-from block3.eval import pairwise_correlations, population_averaged_pairwise_correlation
-from block3.panels import binned_population_activity, rate_sorted_sample
+from block3.measure import pairwise_correlations, population_averaged_pairwise_correlation
+from block3.figures_ab import binned_population_activity, rate_sorted_sample
 
 DURATION_MS = 2000.0
 
@@ -92,7 +92,7 @@ def test_the_rate_matrix_budget_is_checked_before_the_run():
     Discovering that after the simulation would mean losing a multi-day run that wrote
     nothing, so the check has to happen before the network is even built.
     """
-    from block3.panels import check_rate_matrix_fits
+    from block3.figures_ab import check_rate_matrix_fits
 
     config = {"spiking_network": {"burn_in_ms": 100.0, "r_bar_sample_size": 1000,
                                   "populations": {"n_excitatory": 4000},

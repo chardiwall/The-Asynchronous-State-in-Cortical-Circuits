@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fig. 3A and 3B: ONE network, one run, both panels (block3.panels writes the raster,
+# Fig. 3A and 3B: ONE network, one run, both panels (block3.figures_ab writes the raster,
 # the 3 ms tracking curves and the measured/jittered correlation histograms).
 #
 # Not an array job: 3A is one illustrative network and 3B's histogram is over pairs within
@@ -36,4 +36,4 @@ apt-get install -y -qq python3.12-dev python3 build-essential time >/dev/null 2>
 cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits.v2
 mkdir -p artifacts/block3_panels
 /usr/bin/time -v -o "artifacts/block3_panels/time.log" \
-    env PYTHONPATH=src .env/bin/python -m block3.panels
+    env PYTHONPATH=src .env/bin/python -m block3.run panels

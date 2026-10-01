@@ -16,14 +16,14 @@ cluster; the full pass is long but single-process.
 
 ```bash
 # 1. The sweep (this is the expensive one -- see Cost below)
-PYTHONPATH=src .env/bin/python -m block1.run
+PYTHONPATH=src .env/bin/python -m block1.run sweep
 
 # 2. Panels 1B and 1E, from the CSV the sweep just wrote
-PYTHONPATH=src .env/bin/python -m block1.plot_fig1
+PYTHONPATH=src .env/bin/python -m block1.plot
 
 # 3. Panels 1C and 1F -- illustrative traces, fresh short simulation, ~seconds
-PYTHONPATH=src .env/bin/python -m block1.plot_fig1_traces        # 500 ms window
-PYTHONPATH=src .env/bin/python -m block1.plot_fig1_traces 1000   # or pick your own
+PYTHONPATH=src .env/bin/python -m block1.plot        # 500 ms window
+PYTHONPATH=src .env/bin/python -m block1.plot 1000   # or pick your own
 ```
 
 Outputs land in `artifacts/`: `block1_full_pass.csv`, then `fig1b.png`, `fig1e.png`,
@@ -93,24 +93,22 @@ curves will be visibly noisy but the E-only-versus-E+I contrast should already b
 
 | File | Role |
 |---|---|
-| `model.py` | `simulate_pair` — the two-neuron pair. The tested foundation, used directly for calibration and illustrative traces |
-| `dataset.py` | Input generation: literal sharing (`p`) plus mother-train correlation (`r_in`) |
-| `current_trace.py` | Precomputed synaptic current traces (ADR 0002), replacing per-event Brian2 objects |
-| `calibration.py` | Solves for `J_E`, `J_I` from the ±0.75 mV PSP specification |
-| `calibrate_rate.py` | Derives the E-only input rate the paper leaves unstated |
-| `batched_model.py` | `simulate_pairs_batch` — all sweep points in ONE `NeuronGroup(2N)`. Exact, since the points do not couple |
-| `chunking.py` | Drives the batch over a long run, carrying V, `lastspike` and filter state across chunks |
-| `full_pass.py` | **Main script.** Builds the grid, runs it, writes the CSV |
-| `eval.py` | Qualitative trend checks against the paper's stated results |
-| `plot_fig1.py` | Panels 1B and 1E from the CSV |
-| `plot_fig1_traces.py` | Panels 1C and 1F, illustrative traces |
+| `model.py` | The two-neuron pair — the paper's equations, and the tested foundation everything else builds on |
+| `inputs.py` | Input generation: literal sharing (`p`) plus mother-train correlation (`r_in`) |
+| `calibration.py` | The two values the paper specifies indirectly or not at all: the synaptic weights, and each condition's input rate |
+| `run.py` | **The entry point.** `sweep`, `calibrate`, `check` |
+| `plot.py` | All four panels |
+
+Machinery lives in `src/lib`, not here: the synaptic current filter (`psc`), the Brian2
+batching and time chunking (`brian_batch`, `chunking`), the trend check (`checks`) and the
+shared plotting helpers (`plotting`).
 
 ## ⚠ Before running the full pass: one value must be derived first
 
 `block1.run` **raises** until you derive the E+I input rate:
 
 ```bash
-PYTHONPATH=src .env/bin/python -m block1.calibration e_plus_i
+PYTHONPATH=src .env/bin/python -m block1.run calibrate e_plus_i
 ```
 
 then paste the printed value into `config.yaml` as `rate_e_plus_i_calibrated_hz`.

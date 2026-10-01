@@ -6,7 +6,7 @@ was meant to de-risk.
 """
 import pytest
 
-from block3.full_pass import parse_length_s
+from block3.run import parse_length_s
 
 
 def test_the_override_is_used_when_given():

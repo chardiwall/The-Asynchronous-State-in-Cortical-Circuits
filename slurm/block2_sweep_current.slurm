@@ -18,4 +18,4 @@
 #SBATCH --output=artifacts/block2_full_pass_current/slurm_%a.out
 
 cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits.v2
-PYTHONPATH=src .env/bin/python -m block2.full_pass_current "$SLURM_ARRAY_TASK_ID"
+PYTHONPATH=src .env/bin/python -m block2.run current "$SLURM_ARRAY_TASK_ID"

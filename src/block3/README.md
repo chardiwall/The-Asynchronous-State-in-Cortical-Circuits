@@ -61,7 +61,7 @@ only the smoke test is local.
 ### Step 0 — smoke test (local, about 25 minutes)
 
 ```bash
-PYTHONPATH=src .env/bin/python -m block3.full_pass 0 --seconds 5
+PYTHONPATH=src .env/bin/python -m block3.run networks 0 --seconds 5
 ```
 
 Full paper-scale `N` over a short window. Proves the model and the shared analysis pipeline
@@ -75,7 +75,7 @@ duration is the only cheap knob.
 
 ```bash
 sbatch slurm/block3_networks.slurm                                  # 10 networks
-PYTHONPATH=src .env/bin/python -m block3.full_pass --aggregate     # when all 10 land
+PYTHONPATH=src .env/bin/python -m block3.run aggregate     # when all 10 land
 ```
 
 Writes `artifacts/block3_full_pass.csv`: per-network E and I rates and `r̄`.
@@ -89,27 +89,27 @@ sbatch slurm/block3_panels.slurm
 One network, one run, both panels, at `panels.length_s` (5000 s — see item 3 above; this is
 the single most expensive job in the repo). Writes `fig3a_raster.csv`, `fig3a_tracking.csv`
 and `fig3b_correlations.csv` to `artifacts/block3_panels/`. Locally with a short window:
-`PYTHONPATH=src .env/bin/python -m block3.panels --seconds 5`
+`PYTHONPATH=src .env/bin/python -m block3.run panels --seconds 5`
 
 ### Step 3 — Fig. 3C–D (cluster, 90 tasks)
 
 ```bash
 sbatch slurm/block3_vm_ccg.slurm
-PYTHONPATH=src .env/bin/python -m block3.vm_ccg --aggregate
+PYTHONPATH=src .env/bin/python -m block3.run aggregate
 ```
 
 90 tasks = 10 networks × (8 current levels + 1 cross condition), each 50 s of simulated
 time. A single condition can be run directly, which is how to test before submitting:
 
 ```bash
-PYTHONPATH=src .env/bin/python -m block3.vm_ccg 0 -1.3 3.7   # network 0, EPSP vs IPSP
-PYTHONPATH=src .env/bin/python -m block3.vm_ccg 0            # or by flat task index
+PYTHONPATH=src .env/bin/python -m block3.run vm 0 -1.3 3.7   # network 0, EPSP vs IPSP
+PYTHONPATH=src .env/bin/python -m block3.run vm 0            # or by flat task index
 ```
 
 ### Step 4 — plot
 
 ```bash
-PYTHONPATH=src .env/bin/python -m block3.plot_fig3
+PYTHONPATH=src .env/bin/python -m block3.run plot
 ```
 
 ## What "correct" looks like
@@ -177,13 +177,15 @@ caused). Do not reach for it without re-measuring.
 
 | File | Role |
 |---|---|
-| `connectivity.py` | Per-synapse conductance heterogeneity (ADR 0004) and delays, plus the Bernoulli connectivity draw |
-| `model.py` | The Brian2 network: E/I `NeuronGroup`s, X `PoissonGroup`, six `Synapses`. `theta` is a per-neuron parameter so Fig. 3C–D can disable spiking in the recorded cells |
-| `eval.py` | This block's analysis: population rates, per-neuron spike times, neuron subsampling, the pairwise-correlation vector and its `r̄` mean, plus Fig. 3C–D's pair enumeration and CCG peak |
-| `full_pass.py` + `.slurm` | Fig. 3A–B statistics, one network per array task. `--seconds` makes it the smoke test |
-| `panels.py` + `.slurm` | Fig. 3A's raster and tracking curves, Fig. 3B's measured and surrogate histograms |
-| `vm_ccg.py` + `.slurm` | Fig. 3C–D: spiking disabled, `I_app` injected, membrane-potential CCGs |
-| `plot_fig3.py` | All four panels |
+| `model.py` | The Brian2 network: E/I `NeuronGroup`s, X `PoissonGroup`, six `Synapses`. `theta` is per-neuron so Fig. 3C-D can disable spiking in the recorded cells |
+| `connectivity.py` | Per-synapse conductance heterogeneity and delays, plus the Bernoulli draw |
+| `measure.py` | This block's analysis: rates, spike times, subsampling, the pairwise-correlation vector and its mean, plus Fig. 3C-D's pair enumeration and CCG peak |
+| `figures_ab.py` | What one network run records for Fig. 3A and 3B |
+| `figures_cd.py` | Fig. 3C-D: spiking disabled, `I_app` injected, membrane-potential CCGs |
+| `run.py` | **The entry point.** `networks`, `panels`, `vm`, `aggregate`, `plot` |
+| `plot.py` | All four panels |
+
+Machinery lives in `src/lib` (`tasks`, `plotting`); cluster scripts live in `slurm/`.
 
 ## Known deviations from the paper
 

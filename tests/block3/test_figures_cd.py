@@ -8,8 +8,8 @@ import brian2 as b2
 import numpy as np
 import pytest
 
-from block3.eval import recorded_pairs, signed_peak
-from block3.vm_ccg import disable_spiking
+from block3.measure import recorded_pairs, signed_peak
+from block3.figures_cd import disable_spiking
 
 
 def _group(n=4):
@@ -88,7 +88,7 @@ def test_signed_peak_is_undefined_when_every_lag_is():
 
 
 def test_grid_covers_every_level_plus_the_cross_condition(tmp_path):
-    from block3.vm_ccg import build_task_grid
+    from block3.figures_cd import build_task_grid
 
     config = {"spiking_network": {"fig3cd": {
         "i_app_nA": [-1.3, 0.0, 3.7], "n_networks": 2,

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fig. 3C-D: one array task per (network, current condition). With config.yaml's eight
 # I_app levels and ten networks that is 10 * (8 + 1) = 90 tasks -- the "+1" is the
-# EPSP-IPSP cross condition Fig. 3C's gold curve needs (block3.vm_ccg.build_task_grid).
+# EPSP-IPSP cross condition Fig. 3C's gold curve needs (block3.figures_cd.build_task_grid).
 #
 # Each task runs 50 s of simulated time (SOM S-p.21) on the full 9M-synapse network.
 # Measured reference from the Fig. 3A-B full pass on this node: 200 s cost 27h07m wall
@@ -33,4 +33,4 @@ apt-get install -y -qq python3.12-dev python3 build-essential time >/dev/null 2>
 cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits.v2
 mkdir -p artifacts/block3_vm_ccg
 /usr/bin/time -v -o "artifacts/block3_vm_ccg/time_${SLURM_ARRAY_TASK_ID}.log" \
-    env PYTHONPATH=src .env/bin/python -m block3.vm_ccg "$SLURM_ARRAY_TASK_ID"
+    env PYTHONPATH=src .env/bin/python -m block3.run vm "$SLURM_ARRAY_TASK_ID"

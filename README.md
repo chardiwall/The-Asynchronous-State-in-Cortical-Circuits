@@ -27,9 +27,11 @@ the width `σ_r` of its distribution, the current-component correlations
 | `docs/*.pdf` | the source PDFs |
 | `config.yaml` | every seed, path and model parameter — nothing is hardcoded in code |
 | `src/analysis.py` | the shared measurement pipeline, used identically by every block |
+| `src/lib/` | machinery: JIT kernels, Brian2 batching, Slurm-array bookkeeping, plotting helpers |
 | `src/block1/` | Fig. 1 — feedforward postsynaptic pair ([README](src/block1/README.md)) |
 | `src/block2/` | Fig. 2 — recurrent binary network ([README](src/block2/README.md)) |
 | `src/block3/` | Fig. 3 — recurrent conductance-based spiking network ([README](src/block3/README.md)) |
+| `slurm/` | cluster job scripts, named by block and figure |
 | `tests/` | tests, written before the code they cover |
 | `data/raw/` | **read-only** source data |
 | `data/processed/` | generated data |
@@ -38,6 +40,10 @@ the width `σ_r` of its distribution, the current-component correlations
 | [`CONTEXT.md`](CONTEXT.md) | glossary of project terms |
 | [`reviews.md`](reviews.md) | human-readable session log (written by `/finalise`) |
 | [`AGENTS.md`](AGENTS.md) | agent-facing session log (written by `/finalise`) |
+
+Each block holds the paper's own equations and **one entry point**, `run.py`, with
+subcommands. Everything that is machinery rather than science lives in `src/lib`, and
+nothing in `src/lib` imports from a block.
 
 ## Status
 
