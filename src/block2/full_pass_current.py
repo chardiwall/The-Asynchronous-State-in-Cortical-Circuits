@@ -14,7 +14,7 @@ Usage (after the array finishes): python -m block2.full_pass_current --aggregate
 import sys
 
 from block2.eval import current_component_correlations
-from block2.fast_model import simulate_fast_current
+from lib.glauber import simulate_fast_current
 from block2.full_pass import aggregate, task_parameters, write_task
 
 RESULTS_DIR = "artifacts/block2_full_pass_current"

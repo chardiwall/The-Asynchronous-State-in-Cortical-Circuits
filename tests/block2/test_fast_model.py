@@ -7,7 +7,7 @@ concatenated, so the expected h_i is the same independently-computed number.
 """
 import numpy as np
 
-from block2.fast_model import _afferent_current_jit
+from lib.glauber import _afferent_current_jit
 
 THETA = 1.0
 

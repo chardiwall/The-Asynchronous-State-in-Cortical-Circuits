@@ -7,8 +7,8 @@ true for a purely excitatory drive on a LIF neuron.
 import numpy as np
 import pytest
 
-from block1.calibrate_rate import calibrate_input_rate
-from block1.dataset import build_pair_inputs
+from block1.calibration import calibrate_input_rate
+from block1.inputs import build_pair_inputs
 from block1.model import simulate_pair
 
 COMMON_KWARGS = dict(
@@ -142,7 +142,7 @@ def test_the_sweep_grid_uses_the_calibrated_e_plus_i_rate():
     """
     import copy
 
-    from block1.full_pass import build_sweep_points
+    from block1.run import build_sweep_points
     from config import load_config
 
     config = load_config("config.yaml")

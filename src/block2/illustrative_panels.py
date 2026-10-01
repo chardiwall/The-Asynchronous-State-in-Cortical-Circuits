@@ -13,8 +13,8 @@ import numpy as np
 
 from block2.connectivity import couplings
 from block2.eval import COMPONENT_KEYS, current_component_ccg
-from block2.fast_model import simulate_fast_current
-from block2.panel_traces import (
+from lib.glauber import simulate_fast_current
+from lib.glauber_panels import (
     population_mean_trace,
     single_cell_components_trace,
     subsample_state_trace,

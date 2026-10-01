@@ -74,7 +74,7 @@ duration is the only cheap knob.
 ### Step 1 — Fig. 3A–B statistics (cluster, days)
 
 ```bash
-sbatch src/block3/full_pass.slurm                                  # 10 networks
+sbatch slurm/block3_networks.slurm                                  # 10 networks
 PYTHONPATH=src .env/bin/python -m block3.full_pass --aggregate     # when all 10 land
 ```
 
@@ -83,7 +83,7 @@ Writes `artifacts/block3_full_pass.csv`: per-network E and I rates and `r̄`.
 ### Step 2 — Fig. 3A and 3B panel data (cluster, one long run)
 
 ```bash
-sbatch src/block3/panels.slurm
+sbatch slurm/block3_panels.slurm
 ```
 
 One network, one run, both panels, at `panels.length_s` (5000 s — see item 3 above; this is
@@ -94,7 +94,7 @@ and `fig3b_correlations.csv` to `artifacts/block3_panels/`. Locally with a short
 ### Step 3 — Fig. 3C–D (cluster, 90 tasks)
 
 ```bash
-sbatch src/block3/vm_ccg.slurm
+sbatch slurm/block3_vm_ccg.slurm
 PYTHONPATH=src .env/bin/python -m block3.vm_ccg --aggregate
 ```
 

@@ -6,7 +6,7 @@ E-components of two cells' currents.
 import numpy as np
 import pytest
 
-from block2.fast_model import _run_jit_current
+from lib.glauber import _run_jit_current
 
 
 def _inputs(n, seed):

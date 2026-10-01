@@ -16,7 +16,7 @@ from analysis import (
     windowed_rate,
 )
 from block1.calibration import calibrate_synaptic_weights
-from block1.dataset import build_pair_inputs
+from block1.inputs import build_pair_inputs
 from block1.model import simulate_pair
 from config import load_config
 
@@ -59,7 +59,7 @@ def test_streaming_correlation_matches_stationary_correlation_on_one_chunk():
 
 def test_streaming_correlation_matches_when_split_into_chunks():
     # The point of StreamingCorrelation: chunking the input must not change the result
-    # (block1.full_pass streams chunks instead of holding the full L=10,000s array).
+    # (block1.run streams chunks instead of holding the full L=10,000s array).
     rng = np.random.default_rng(6)
     x = rng.normal(loc=3.0, scale=2.0, size=10_000)
     y = -0.4 * x + rng.normal(scale=1.5, size=10_000)

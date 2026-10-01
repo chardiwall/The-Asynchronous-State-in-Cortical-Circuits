@@ -5,7 +5,7 @@ given the same dt-grid assumption Brian2's own SpikeGeneratorGroup already makes
 import numpy as np
 import pytest
 
-from block1.current_trace import synaptic_trace
+from lib.psc import synaptic_trace
 
 TAU_S_MS = 5.0
 DT_MS = 0.01

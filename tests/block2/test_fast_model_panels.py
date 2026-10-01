@@ -11,7 +11,7 @@ _run_jit_current but recording state, not current.
 """
 import numpy as np
 
-from block2.panel_traces import (
+from lib.glauber_panels import (
     _run_jit_cell_components,
     _run_jit_population_mean,
     _run_jit_subsample_state,

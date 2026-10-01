@@ -1,7 +1,7 @@
 """Seams: the Python-level wrappers around panel_traces' JIT recordings --
 build connectivity + initial state, matching simulate_fast_current's pattern.
 """
-from block2.panel_traces import (
+from lib.glauber_panels import (
     population_mean_trace,
     single_cell_components_trace,
     subsample_state_trace,

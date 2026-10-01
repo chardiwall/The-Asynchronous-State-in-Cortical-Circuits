@@ -24,7 +24,7 @@ from dataclasses import dataclass
 import brian2 as b2
 import numpy as np
 
-from block1.current_trace import bin_edges, synaptic_trace
+from lib.psc import bin_edges, synaptic_trace
 
 
 

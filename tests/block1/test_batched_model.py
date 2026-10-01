@@ -7,8 +7,8 @@ alone would produce, for every k, regardless of what the other N-1 points' input
 import numpy as np
 import pytest
 
-from block1.batched_model import simulate_pairs_batch
-from block1.chunking import simulate_pairs_batch_chunked
+from lib.brian_batch import simulate_pairs_batch
+from lib.chunking import simulate_pairs_batch_chunked
 from block1.model import simulate_pair
 
 TAU_M_MS = 10.0
@@ -136,7 +136,7 @@ def test_batch_carry_forward_matches_chained_calls():
 
 
 def test_batch_chunked_matches_unchunked_batch_call():
-    # Exercises simulate_pairs_batch_chunked directly -- the generator block1.full_pass
+    # Exercises simulate_pairs_batch_chunked directly -- the generator block1.run
     # actually drives -- rather than only the manually-chained carry-forward parameters
     # tested above. Point 0: the same refractory-straddling cascade; point 1: silent.
     duration_ms = 100.0

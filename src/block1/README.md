@@ -16,7 +16,7 @@ cluster; the full pass is long but single-process.
 
 ```bash
 # 1. The sweep (this is the expensive one -- see Cost below)
-PYTHONPATH=src .env/bin/python -m block1.full_pass
+PYTHONPATH=src .env/bin/python -m block1.run
 
 # 2. Panels 1B and 1E, from the CSV the sweep just wrote
 PYTHONPATH=src .env/bin/python -m block1.plot_fig1
@@ -107,10 +107,10 @@ curves will be visibly noisy but the E-only-versus-E+I contrast should already b
 
 ## ⚠ Before running the full pass: one value must be derived first
 
-`block1.full_pass` **raises** until you derive the E+I input rate:
+`block1.run` **raises** until you derive the E+I input rate:
 
 ```bash
-PYTHONPATH=src .env/bin/python -m block1.calibrate_rate e_plus_i
+PYTHONPATH=src .env/bin/python -m block1.calibration e_plus_i
 ```
 
 then paste the printed value into `config.yaml` as `rate_e_plus_i_calibrated_hz`.

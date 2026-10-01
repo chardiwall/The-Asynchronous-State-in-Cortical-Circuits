@@ -6,7 +6,7 @@ holding the whole trace in memory.
 """
 import numpy as np
 
-from block1.batched_model import simulate_pairs_batch
+from lib.brian_batch import simulate_pairs_batch
 
 
 def chunk_boundaries(total_duration_ms: float, chunk_duration_ms: float):
@@ -42,7 +42,7 @@ def simulate_pairs_batch_chunked(
     input_provider(start_ms, end_ms) -> (e_spikes_a, i_spikes_a, e_spikes_b, i_spikes_b),
     each a length-n list of that chunk's pooled arrival times for point 0..n-1. Taking a
     callback rather than pre-built full-duration spike lists is what keeps memory bounded
-    at production scale: block1.full_pass regenerates each point's inputs per chunk
+    at production scale: block1.run regenerates each point's inputs per chunk
     (Poisson processes have independent increments, so this is statistically exact, not
     an approximation -- the same reasoning the deleted train.py's _run_point_chunked
     established).
@@ -51,7 +51,7 @@ def simulate_pairs_batch_chunked(
     chunks itself (holding e.g. the full L=10,000s current trace for all n points at
     once would defeat the point of chunking -- a real issue a review caught in an
     earlier version of this pipeline). The caller consumes each chunk's result as it's
-    produced -- e.g. block1.full_pass folds it into a running analysis.StreamingCorrelation
+    produced -- e.g. block1.run folds it into a running analysis.StreamingCorrelation
     per point and only appends the much smaller spike-time arrays.
     """
     v_init_a, v_init_b = np.zeros(n), np.zeros(n)

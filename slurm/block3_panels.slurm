@@ -15,7 +15,7 @@
 # on top of the ~4GB network state measured for the 200 s run. panels.py refuses to start
 # if the matrix would exceed panels.max_rate_matrix_gb, so a misconfiguration fails in
 # seconds rather than after five days.
-#   sbatch src/block3/panels.slurm
+#   sbatch slurm/block3_panels.slurm
 #SBATCH --job-name=block3_panels
 #SBATCH --partition=gpu
 #SBATCH --nodelist=spark-c3d8

@@ -1,55 +1,65 @@
-"""Fig. 1C and 1F's illustrative single-trial traces at p=0.2, r_in=0.025 (the black and
-blue circles of Fig. 1E). Purely visual, not a measurement: each runs one short fresh
-simulation and draws three stacked rows -- input raster, synaptic current, membrane
-potential -- with scale bars instead of full axes, matching the paper's presentation.
-1C is the E-only condition, 1F adds I and splits the current row into its E and I
-components, which is the panel's whole point: they excurse together and cancel.
+"""Fig. 1's four panels. Usage: python -m block1.plot [trace_duration_ms]
 
-The sweep curves 1B/1E live in plot_fig1.py; the two answer different questions.
-
-Current-based model note: this project's current (i_syn_*_mV, calibration.py) is in mV,
-not nA -- the paper's own 1C/1F scale bar is in nA because it illustrates a literal
-current; the bar here is in mV, sized to the traces' own range.
-
-Usage: python -m block1.plot_fig1_traces [duration_ms]
+1B and 1E are sweep curves from the CSV block1.run writes: c dashed, r_out as a marker line,
+one combined panel each. 1C and 1F are illustrative single-trial traces at the example point
+-- raster, synaptic current, membrane potential, scale bars instead of axes, purely visual.
+1F splits the current into E and I components: they excurse together and cancel, which is
+the panel's point. The bar is in mV, not the paper's nA, since this model is current-based
+with V relative to rest.
 """
+import csv
+from collections import defaultdict
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 from block1.calibration import calibrate_synaptic_weights
-from block1.current_trace import synaptic_trace
-from block1.dataset import build_pair_inputs, mother_train_pool
+from block1.inputs import build_pair_inputs, mother_train_pool
 from block1.model import simulate_pair
+from config import load_config
+from lib.plotting import BLUE, ORANGE, scale_bar
+from lib.psc import synaptic_trace
 
 N_DISPLAY_TRAINS = 30  # illustrative raster row count -- see _raster_trains
 
+def load_full_pass_csv(path: str) -> dict[str, list[dict]]:
+    """The sweep CSV grouped by phase, each group sorted along its own swept parameter."""
+    by_phase: dict[str, list[dict]] = defaultdict(list)
+    for row in csv.DictReader(open(path, newline="")):
+        by_phase[row["phase"]].append(
+            {**row, **{k: float(row[k]) for k in ("p", "r_in", "c", "r_out")}})
+    for phase, rows in by_phase.items():
+        rows.sort(key=lambda r: r["p"] if phase == "fig1b" else r["r_in"])
+    return by_phase
 
-def _round_scale(value: float) -> float:
-    """A visually clean scale-bar magnitude close to value (1/2/5 * 10^k)."""
-    if value <= 0:
-        return 1.0
-    exponent = np.floor(np.log10(value))
-    for m in (1, 2, 5, 10):
-        if m * 10 ** exponent >= value:
-            return float(m * 10 ** exponent)
-    return float(10 ** (exponent + 1))
 
-
-def _scale_bar(ax, y_range: float, y_unit: str, x_range_ms: float = 50.0) -> None:
-    """Hides the box and ticks (the paper's style) and draws an L-shaped scale bar in the
-    bottom-right, sized to the data: x_range_ms of time by a clean-rounded y_range.
+def _plot_correlation_series(ax, x_key: str, series: list[tuple[list[dict], str, str]]) -> None:
+    """Draws c (dashed) and r_out ('-o-') for each (rows, color, label) series on one
+    axis -- the shared shape of Fig. 1B (one series) and Fig. 1E (two: E-only, E+I).
     """
-    ax.axis("off")
-    y_bar = _round_scale(y_range * 0.4)
-    xlim, ylim = ax.get_xlim(), ax.get_ylim()
-    x0 = xlim[1] - x_range_ms
-    y0 = ylim[0] + 0.05 * (ylim[1] - ylim[0])
-    ax.plot([x0, x0 + x_range_ms], [y0, y0], color="black", linewidth=1.5)
-    ax.plot([x0, x0], [y0, y0 + y_bar], color="black", linewidth=1.5)
-    ax.text(x0 + x_range_ms / 2, y0 - 0.03 * (ylim[1] - ylim[0]), f"{x_range_ms:.0f} ms",
-            ha="center", va="top", fontsize=8)
-    ax.text(x0 - 0.01 * (xlim[1] - xlim[0]), y0 + y_bar / 2, f"{y_bar:.2g} {y_unit}",
-            ha="right", va="center", fontsize=8)
+    for rows, color, label in series:
+        x = [r[x_key] for r in rows]
+        c = [r["c"] for r in rows]
+        r_out = [r["r_out"] for r in rows]
+        c_label = f"{label}: c" if label else "c"
+        r_out_label = f"{label}: r_out" if label else "r_out"
+        ax.plot(x, c, "--", color=color, linewidth=2, label=c_label)
+        ax.plot(x, r_out, "-o", color=color, linewidth=2, markersize=7, label=r_out_label)
+    ax.set_xlim(0.0, 0.5)
+    ax.set_ylim(0.0, 1.0)
+    ax.set_ylabel("Correlation")
+    ax.legend(frameon=False, fontsize=8)
+
+
+def plot_sweep(series, x_key: str, x_label: str, title: str, out_path: str) -> None:
+    """Either sweep panel: 1B is one series against p, 1E is two against r_in."""
+    fig, ax = plt.subplots(figsize=(6, 5))
+    _plot_correlation_series(ax, x_key, series)
+    ax.set_xlabel(x_label)
+    ax.set_title(title)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=120)
+    plt.close(fig)
 
 
 def _raster_trains(rate_hz, r_in, duration_ms, jitter_tau_ms, rng, n_display=N_DISPLAY_TRAINS):
@@ -63,10 +73,8 @@ def _raster_trains(rate_hz, r_in, duration_ms, jitter_tau_ms, rng, n_display=N_D
 
 
 def _run_example(config: dict, duration_ms: float, rng, with_inhibition: bool):
-    """One illustrative trial at the Fig. 1E example point. The E-only and E+I panels
-    differ only in whether I inputs exist and which input rate applies (the E-only rate is
-    calibrated, see calibrate_rate.py), so both conditions share this one path.
-    """
+    """One illustrative trial at the Fig. 1E example point. The two conditions differ only
+    in whether I inputs exist and which calibrated rate applies, so they share this path."""
     pair = config["pair_model"]
     neuron, synapse, inputs_cfg = pair["neuron"], pair["synapse"], pair["inputs"]
     p = pair["sweeps"]["p_fixed"]
@@ -78,7 +86,7 @@ def _run_example(config: dict, duration_ms: float, rng, with_inhibition: bool):
                else inputs_cfg["rate_e_only_calibrated_hz"])
     if rate_hz is None:
         raise ValueError("config.yaml: rate_e_plus_i_calibrated_hz is null -- derive it with "
-                         "`python -m block1.calibrate_rate e_plus_i` before plotting Fig. 1F.")
+                         "`python -m block1.calibration e_plus_i` before plotting Fig. 1F.")
     j_e, j_i = calibrate_synaptic_weights(config)
 
     inputs = build_pair_inputs(
@@ -100,10 +108,10 @@ def _run_example(config: dict, duration_ms: float, rng, with_inhibition: bool):
 
 
 def _membrane_panel(ax, result) -> None:
-    """The bottom row shared by 1C and 1F: both cells' V_m, scale-barred."""
+    """1C and 1F's shared bottom row: both cells' V_m."""
     ax.plot(result.t_ms, result.v_a_mV, color="black")
     ax.plot(result.t_ms, result.v_b_mV, color="0.6")
-    _scale_bar(ax, float(np.ptp(np.concatenate([result.v_a_mV, result.v_b_mV]))), "mV")
+    scale_bar(ax, float(np.ptp(np.concatenate([result.v_a_mV, result.v_b_mV]))), "mV")
     ax.set_title("membrane potential")
 
 
@@ -122,7 +130,7 @@ def plot_fig1c(config: dict, duration_ms: float, rng, out_path: str) -> None:
 
     axes[1].plot(result.t_ms, result.i_syn_a_mV, color="black")
     axes[1].plot(result.t_ms, result.i_syn_b_mV, color="0.6")
-    _scale_bar(axes[1], float(np.ptp(np.concatenate([result.i_syn_a_mV, result.i_syn_b_mV]))), "mV")
+    scale_bar(axes[1], float(np.ptp(np.concatenate([result.i_syn_a_mV, result.i_syn_b_mV]))), "mV")
     axes[1].set_title("synaptic current")
 
     _membrane_panel(axes[2], result)
@@ -160,7 +168,7 @@ def plot_fig1f(config: dict, duration_ms: float, rng, out_path: str) -> None:
 
     axes[1].plot(result.t_ms, i_e_a, color="green", label="E current")
     axes[1].plot(result.t_ms, i_i_a, color="red", label="I current")
-    _scale_bar(axes[1], float(np.ptp(np.concatenate([i_e_a, i_i_a]))), "mV")
+    scale_bar(axes[1], float(np.ptp(np.concatenate([i_e_a, i_i_a]))), "mV")
     axes[1].legend(loc="upper right", frameon=False, fontsize=8)
     axes[1].set_title("synaptic current (E, I separately)")
 
@@ -173,12 +181,18 @@ def plot_fig1f(config: dict, duration_ms: float, rng, out_path: str) -> None:
 if __name__ == "__main__":
     import sys
 
-    from config import load_config
-
     config = load_config("config.yaml")
+    rows = load_full_pass_csv("artifacts/block1_full_pass.csv")
+    plot_sweep([(rows["fig1b"], BLUE, "")], "p", "Shared input fraction p",
+               "Fig. 1B (E-only, r_in=0, L=10,000s)", "artifacts/fig1b.png")
+    plot_sweep([(rows["fig1e_e_only"], BLUE, "E only"),
+                (rows["fig1e_e_plus_i"], ORANGE, "E and I")],
+               "r_in", "Input spike correlation r_in",
+               "Fig. 1E (p=0.2, L=10,000s): E-only vs E+I", "artifacts/fig1e.png")
+
     # A few hundred ms of one trial -- these panels show shape, not a measurement.
     duration_ms = float(sys.argv[1]) if len(sys.argv) > 1 else 500.0
     rng = np.random.default_rng(config["seed"])
     plot_fig1c(config, duration_ms, rng, "artifacts/fig1c.png")
     plot_fig1f(config, duration_ms, rng, "artifacts/fig1f.png")
-    print("wrote fig1c/fig1f.png to artifacts/")
+    print("wrote fig1b/c/e/f.png to artifacts/")

@@ -32,13 +32,13 @@ Both walk the same `(N, realisation)` grid, 347 tasks at the config's defaults.
 
 ```bash
 # Firing correlations (r-bar). Submit PER SIZE TIER -- see the memory note below.
-sbatch --array=0-299%20  --mem=1G src/block2/full_pass.slurm
-sbatch --array=300-324%20 --mem=3G src/block2/full_pass.slurm
-sbatch --array=325-336%19 --mem=6G src/block2/full_pass.slurm
-sbatch --array=337-346%13 --mem=9G src/block2/full_pass.slurm
+sbatch --array=0-299%20  --mem=1G slurm/block2_sweep.slurm
+sbatch --array=300-324%20 --mem=3G slurm/block2_sweep.slurm
+sbatch --array=325-336%19 --mem=6G slurm/block2_sweep.slurm
+sbatch --array=337-346%13 --mem=9G slurm/block2_sweep.slurm
 
 # Current correlations (c, c_EE, c_II, c_EI). Memory is flat across N here.
-sbatch --mem=6G src/block2/full_pass_current.slurm
+sbatch --mem=6G slurm/block2_sweep_current.slurm
 
 # Once BOTH jobs have fully finished:
 PYTHONPATH=src .env/bin/python -m block2.full_pass --aggregate

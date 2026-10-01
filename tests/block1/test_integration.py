@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from block1.calibration import calibrate_synaptic_weights
-from block1.dataset import build_pair_inputs
+from block1.inputs import build_pair_inputs
 from block1.model import simulate_pair
 from config import load_config
 

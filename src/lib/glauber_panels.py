@@ -7,7 +7,7 @@ import numpy as np
 from numba import njit
 
 from block2.connectivity import build_weights_stacked
-from block2.fast_model import _tick_jit
+from lib.glauber import _tick_jit
 from block2.simulate import _ticks_per_sample
 
 

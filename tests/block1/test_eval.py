@@ -4,7 +4,7 @@ correlation rather than a strict monotonicity check that a single noisy point wo
 """
 import pytest
 
-from block1.eval import check_increasing_trend
+from block1.run import check_increasing_trend
 
 
 def test_perfectly_increasing_values_pass():

@@ -10,10 +10,10 @@
 # grid (most tasks need only megabytes) -- and a value too small for the
 # actual N being run causes real OOM kills, not just queuing (both observed on
 # the DGX in session 2026-09-12; see docs/adr/0003). Submit per tier, e.g.:
-#   sbatch --array=0-299%20  --mem=1G src/block2/full_pass.slurm   # N<=1780
-#   sbatch --array=300-324%20 --mem=3G src/block2/full_pass.slurm  # N=3160
-#   sbatch --array=325-336%19 --mem=6G src/block2/full_pass.slurm  # N=5620
-#   sbatch --array=337-346%13 --mem=9G src/block2/full_pass.slurm  # N=8192
+#   sbatch --array=0-299%20  --mem=1G slurm/block2_sweep.slurm   # N<=1780
+#   sbatch --array=300-324%20 --mem=3G slurm/block2_sweep.slurm  # N=3160
+#   sbatch --array=325-336%19 --mem=6G slurm/block2_sweep.slurm  # N=5620
+#   sbatch --array=337-346%13 --mem=9G slurm/block2_sweep.slurm  # N=8192
 #SBATCH --job-name=block2_full_pass
 #SBATCH --partition=gpu
 #SBATCH --nodelist=spark-c3d8

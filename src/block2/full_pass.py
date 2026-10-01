@@ -19,7 +19,7 @@ import sys
 
 from block2.connectivity import couplings
 from block2.eval import population_averaged_correlation
-from block2.fast_model import simulate_fast_one
+from lib.glauber import simulate_fast_one
 from config import load_config
 
 RESULTS_DIR = "artifacts/block2_full_pass"

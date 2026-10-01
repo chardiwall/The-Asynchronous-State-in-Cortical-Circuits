@@ -8,7 +8,7 @@ this is required to reproduce M-Eq(1)'s N*r_in amplification (see PROGRESS.md de
 import numpy as np
 import pytest
 
-from block1.dataset import build_pair_inputs, mother_train_pool, shared_count
+from block1.inputs import build_pair_inputs, mother_train_pool, shared_count
 
 RNG_SEED = 1234
 

@@ -1,34 +1,30 @@
-"""Block 1's main script: the paper-accurate full pass (L=10,000s) across all three Fig. 1
-sweeps -- 1B's p (E-only, r_in=0), 1E's r_in for E-only and for E+I. All 21 sweep points are
-batched into ONE Brian2 simulation per time chunk (chunking.simulate_pairs_batch_chunked)
-instead of one Brian2 run per point: the points don't couple to each other, so batching
-is exact, and it turns the previous run's dominant cost (many separate per-point Brian2
-b2.run() calls, see PROGRESS.md's Phase 3.6 benchmark) into one amortized cost, giving a
-GPU backend real per-timestep width to parallelize over.
+"""Block 1's one entry point. Everything Fig. 1 needs is a subcommand here.
 
-Correlations are accumulated per chunk (analysis.StreamingCorrelation) rather than by
-concatenating every chunk's full current trace and correlating at the end -- holding all
-chunks' (n_samples, 15) arrays simultaneously would reinstate the full-duration memory
-footprint chunking exists to avoid.
+    python -m block1.run sweep          the paper-accurate pass, L=10,000 s, all 21 points
+    python -m block1.run calibrate e_only | e_plus_i
+    python -m block1.run check          qualitative trend checks against the paper
 
-This replaced a subprocess-per-point architecture that existed purely to survive memory
-pressure on a much smaller machine; on the DGX (121GB RAM) that isolation is unnecessary,
-so this script runs as one ordinary process and writes a single CSV at the end.
+All 21 sweep points batch into ONE Brian2 simulation per time chunk -- the points do not
+couple, so batching is exact and amortises Brian2's per-run cost across the whole grid.
+Correlations accumulate per chunk rather than by concatenating every chunk's trace, which
+would reinstate the memory footprint chunking exists to avoid.
 
-Usage: python -m block1.full_pass
+Plots live in block1.plot; the machinery this drives lives in src/lib.
 """
 import csv
 import datetime
 import hashlib
+import sys
 import time
 
 import numpy as np
 
 from analysis import StreamingCorrelation, spike_count_correlation
-from block1.chunking import simulate_pairs_batch_chunked
-from block1.calibration import calibrate_synaptic_weights
-from block1.dataset import build_pair_inputs
+from block1.calibration import calibrate_from_config, calibrate_synaptic_weights
+from block1.inputs import build_pair_inputs
 from config import load_config
+from lib.checks import check_increasing_trend
+from lib.chunking import simulate_pairs_batch_chunked
 
 CSV_PATH = "artifacts/block1_full_pass.csv"
 CSV_FIELDS = [
@@ -38,16 +34,15 @@ CSV_FIELDS = [
 
 
 def _deterministic_seed_offset(phase: str, p: float, r_in: float, modulus: int = 100_000) -> int:
-    """sha256 of a canonical string encoding -- reproducible across processes/machines,
-    unlike Python's hash() of strings (randomized per-process via PYTHONHASHSEED).
-    """
+    """sha256, not hash(): Python randomises string hashing per process, so hash() would
+    give a different grid on every run."""
     key = f"{phase}:{p!r}:{r_in!r}".encode()
     digest = hashlib.sha256(key).hexdigest()
     return int(digest, 16) % modulus
 
 
 def build_sweep_points(config: dict) -> list[dict]:
-    """The 15 (phase, p, r_in) points making up Fig. 1B + Fig. 1E (E-only, E+I)."""
+    """The (phase, p, r_in) points making up Fig. 1B and Fig. 1E (E-only and E+I)."""
     inputs_cfg = config["pair_model"]["inputs"]
     sweeps = config["pair_model"]["sweeps"]
     n_e = inputs_cfg["n_excitatory"]
@@ -71,7 +66,7 @@ def build_sweep_points(config: dict) -> list[dict]:
     if rate_e_plus_i is None:
         raise ValueError(
             "config.yaml: pair_model.inputs.rate_e_plus_i_calibrated_hz is null. Derive it "
-            "first with `python -m block1.calibrate_rate e_plus_i`, then paste the value in. "
+            "first with `python -m block1.calibration e_plus_i`, then paste the value in. "
             "Falling back to the paper's stated 20 Hz would put Fig. 1E's E-only and E+I "
             "curves at ~5 Hz and ~12 Hz output respectively."
         )
@@ -160,10 +155,29 @@ def write_csv(rows: list[dict], path: str = CSV_PATH) -> None:
 
 
 def main():
+    command = sys.argv[1] if len(sys.argv) > 1 else "sweep"
     config = load_config("config.yaml")
-    rows = run_full_pass(config)
-    write_csv(rows)
-    print(f"wrote {len(rows)} rows to {CSV_PATH}")
+
+    if command == "calibrate":
+        condition = sys.argv[2]
+        rate = calibrate_from_config(condition, config)
+        print(f"{condition}: input rate {rate:.5f} Hz gives ~5 Hz output at r_in = 0.\n"
+              f"Put it in config.yaml and record the settings used.")
+    elif command == "check":
+        rows = [dict(r) for r in csv.DictReader(open(CSV_PATH))]
+        for phase in ("fig1b", "fig1e_e_only", "fig1e_e_plus_i"):
+            sub = sorted((r for r in rows if r["phase"] == phase),
+                         key=lambda r: float(r["p"] if phase == "fig1b" else r["r_in"]))
+            x = [float(r["p"] if phase == "fig1b" else r["r_in"]) for r in sub]
+            ok = check_increasing_trend(x, [float(r["r_out"]) for r in sub],
+                                        config["qualitative_checks"]["increasing_trend_min_correlation"])
+            print(f"{phase}: r_out increases with the swept parameter -> {ok}")
+    elif command == "sweep":
+        rows = run_full_pass(config)
+        write_csv(rows)
+        print(f"wrote {len(rows)} rows to {CSV_PATH}")
+    else:
+        raise SystemExit(f"unknown command {command!r}; expected sweep, calibrate or check")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ cell's current, so I cells are not needed for it.
 """
 import numpy as np
 
-from block2.fast_model import simulate_fast_current
+from lib.glauber import simulate_fast_current
 
 J = {"EE": 1.0, "EI": -1.0, "EX": 1.0, "IE": 1.0, "II": -1.0, "IX": 1.0}
 COMMON = dict(n=20, p=0.5, j=J, m_x=0.3, theta=0.5, length_tau=2,

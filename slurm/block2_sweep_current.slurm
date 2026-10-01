@@ -7,7 +7,7 @@
 # population's binary state, so a single --mem=6G (submitted 2026-09-12,
 # worst case ~4.6GB at N=8192) covers the whole grid at near-20-way
 # concurrency -- no per-tier submission needed here, unlike full_pass.slurm.
-#   sbatch --mem=6G src/block2/full_pass_current.slurm
+#   sbatch --mem=6G slurm/block2_sweep_current.slurm
 #SBATCH --job-name=block2_full_pass_current
 #SBATCH --partition=gpu
 #SBATCH --nodelist=spark-c3d8

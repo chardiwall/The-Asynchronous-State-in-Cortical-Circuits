@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from analysis import exact_current_correlation
-from block1.dataset import build_pair_inputs
+from block1.inputs import build_pair_inputs
 
 DURATION_MS = 400_000.0
 COARSE_BIN_MS = 200.0   # >> the 5 ms mother-train jitter, so the STATIC formula applies

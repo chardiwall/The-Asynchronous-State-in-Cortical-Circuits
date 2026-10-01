@@ -6,7 +6,7 @@ trace obeys the same linear ds_i/dt = -s_i/tau_s + delta(t-t_i), their sum obeys
 ODE driven by the pooled (merged) set of all E-population arrival times onto that cell -- so
 this model takes one pooled arrival-time array per cell per population, not per-input identity.
 
-s_E(t)/s_I(t) are precomputed via block1.current_trace.synaptic_trace (ADR 0002) and fed to
+s_E(t)/s_I(t) are precomputed via lib.psc.synaptic_trace (ADR 0002) and fed to
 Brian2 as TimedArrays, rather than built from per-event SpikeGeneratorGroup/Synapses objects
 -- the latter doesn't scale to Fig. 1's real input volume (see ADR 0002). This is an internal
 rework only; the public seam (pooled arrival arrays in, PairResult out) is unchanged.
@@ -24,7 +24,7 @@ from dataclasses import dataclass
 import brian2 as b2
 import numpy as np
 
-from block1.current_trace import bin_edges, synaptic_trace
+from lib.psc import bin_edges, synaptic_trace
 
 
 @dataclass

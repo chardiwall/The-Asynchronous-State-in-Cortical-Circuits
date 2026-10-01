@@ -4,7 +4,7 @@ the shape full_pass.py consumes directly, with no intermediate per-realisation c
 """
 import numpy as np
 
-from block2.fast_model import simulate_fast_one
+from lib.glauber import simulate_fast_one
 
 J = {"EE": 1.0, "EI": -1.0, "EX": 1.0, "IE": 1.0, "II": -1.0, "IX": 1.0}
 

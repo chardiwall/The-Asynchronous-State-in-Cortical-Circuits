@@ -19,7 +19,7 @@ def stationary_correlation(x: np.ndarray, y: np.ndarray) -> float:
 class StreamingCorrelation:
     """The same Pearson correlation stationary_correlation computes, accumulated over a
     sequence of chunks instead of one array held in memory at once -- for a series too
-    long to hold in full (e.g. block1.full_pass's L=10,000s current traces, chunked over
+    long to hold in full (e.g. block1.run's L=10,000s current traces, chunked over
     time). Mathematically exact, not an approximation: Cov/Var are themselves just sums,
     so summing per-chunk partial sums and combining once at the end gives the identical
     result stationary_correlation(full concatenated x, y) would (verified in

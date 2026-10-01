@@ -11,7 +11,7 @@
 # (50s / 1ms) samples x 8 bytes is only 8MB, so the network state still dominates.
 #
 # Container wrapper: spark-c3d8 has no python3.12-dev and no sudo (docs/adr/0005).
-#   sbatch src/block3/vm_ccg.slurm
+#   sbatch slurm/block3_vm_ccg.slurm
 #SBATCH --job-name=block3_vm_ccg
 #SBATCH --partition=gpu
 #SBATCH --nodelist=spark-c3d8
