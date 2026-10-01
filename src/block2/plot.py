@@ -19,7 +19,6 @@ import numpy as np
 from config import load_config
 
 GREEN, RED, BLUE, BLACK, ORANGE = "#2ca02c", "#d62728", "#1f77b4", "#000000", "#e08214"
-OUT_DIR = "artifacts/block2_illustrative"
 EI_LAG_ZOOM_MS = 5.0   # half-width of 2D's and 2E's EI-Lag insets
 
 
@@ -35,7 +34,7 @@ def _by_size(rows: list[dict]) -> dict[int, list[dict]]:
     return dict(sorted(grouped.items()))
 
 
-def plot_fig2b(csv_path: str = f"{OUT_DIR}/panel_b.csv", out_path: str = f"{OUT_DIR}/fig2b.png") -> None:
+def plot_fig2b(csv_path: str, out_path: str) -> None:
     rows = _read_csv(csv_path)
     t = [r["t_ms"] for r in rows]
     fig, ax = plt.subplots(figsize=(6, 3.5))
@@ -50,7 +49,7 @@ def plot_fig2b(csv_path: str = f"{OUT_DIR}/panel_b.csv", out_path: str = f"{OUT_
     plt.close(fig)
 
 
-def plot_fig2d(csv_path: str = f"{OUT_DIR}/panel_d.csv", out_path: str = f"{OUT_DIR}/fig2d.png") -> None:
+def plot_fig2d(csv_path: str, out_path: str) -> None:
     """z-scored m_E/m_I/m_X per network size, with an inset magnifying one instance of
     the E-to-I lag (the paper's "EI-Lag") in each panel.
     """
@@ -80,7 +79,7 @@ def plot_fig2d(csv_path: str = f"{OUT_DIR}/panel_d.csv", out_path: str = f"{OUT_
     plt.close(fig)
 
 
-def plot_fig2e(csv_path: str = f"{OUT_DIR}/panel_e.csv", out_path: str = f"{OUT_DIR}/fig2e.png",
+def plot_fig2e(csv_path: str, out_path: str,
                 display_lag_ms: float | None = None) -> None:
     """Population-averaged CCGs of the current COMPONENTS at the largest N, with two insets
     across every N: the total CCG's peak (top) and the EI/IE peaks (bottom), which is where
@@ -133,7 +132,7 @@ def plot_fig2e(csv_path: str = f"{OUT_DIR}/panel_e.csv", out_path: str = f"{OUT_
     plt.close(fig)
 
 
-def plot_fig2g(csv_path: str = f"{OUT_DIR}/panel_g.csv", out_path: str = f"{OUT_DIR}/fig2g.png") -> None:
+def plot_fig2g(csv_path: str, out_path: str) -> None:
     r_values = [row["r"] for row in _read_csv(csv_path)]
     fig, ax = plt.subplots(figsize=(5, 4))
     ax.hist(r_values, bins=100, color=GREEN, alpha=0.8)
@@ -147,10 +146,15 @@ def plot_fig2g(csv_path: str = f"{OUT_DIR}/panel_g.csv", out_path: str = f"{OUT_
 
 if __name__ == "__main__":
     from block2.plot_sweep import plot_fig2c
+    from config import load_config, output_path
 
-    plot_fig2b()
-    plot_fig2c()
-    plot_fig2d()
-    plot_fig2e()
-    plot_fig2g()
-    print(f"wrote fig2b/c/d/e/g.png to {OUT_DIR}/")
+    config = load_config("config.yaml")
+    panels_dir = output_path(config, "block2_panels_dir")
+    plot_fig2b(f"{panels_dir}/panel_b.csv", output_path(config, "block2_fig2b"))
+    plot_fig2d(f"{panels_dir}/panel_d.csv", output_path(config, "block2_fig2d"))
+    plot_fig2e(f"{panels_dir}/panel_e.csv", output_path(config, "block2_fig2e"))
+    plot_fig2g(f"{panels_dir}/panel_g.csv", output_path(config, "block2_fig2g"))
+    plot_fig2c(output_path(config, "block2_sweep_csv"),
+               output_path(config, "block2_current_csv"),
+               output_path(config, "block2_fig2c"))
+    print(f"wrote fig2b/c/d/e/g.png to {panels_dir}/")

@@ -10,7 +10,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from block2.plot import BLACK, BLUE, GREEN, ORANGE, OUT_DIR, RED, _read_csv
+from block2.plot import BLACK, BLUE, GREEN, ORANGE, RED, _read_csv
 
 
 def _label(name: str) -> str:
@@ -39,11 +39,7 @@ def _plot_signed(ax, sizes, values, color, label, hollow: bool = False) -> None:
                   markerfacecolor="white", markeredgewidth=1.6, linestyle="none")
 
 
-def plot_fig2c(
-    firing_csv: str = "artifacts/block2_full_pass.csv",
-    current_csv: str = "artifacts/block2_full_pass_current.csv",
-    out_path: str = f"{OUT_DIR}/fig2c.png",
-) -> None:
+def plot_fig2c(firing_csv: str, current_csv: str, out_path: str) -> None:
     """r (hollow squares), the total current correlation c (filled squares) and the six
     current components versus N, log-log, with the paper's 1/N and 1/sqrt(N) guide lines.
 

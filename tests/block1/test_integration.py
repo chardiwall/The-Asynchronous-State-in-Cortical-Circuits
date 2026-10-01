@@ -11,7 +11,7 @@ import pytest
 from block1.calibration import calibrate_synaptic_weights
 from block1.inputs import build_pair_inputs
 from block1.model import simulate_pair
-from config import load_config
+from config import load_config, output_path
 
 
 def _zoh_bias_tol(dt_ms: float, tau_s_ms: float, safety_factor: float = 3.0) -> float:
@@ -20,9 +20,10 @@ def _zoh_bias_tol(dt_ms: float, tau_s_ms: float, safety_factor: float = 3.0) -> 
 
 
 def _log(record: dict) -> None:
-    with open("artifacts/metrics.jsonl", "a") as f:
+    config = load_config("config.yaml")
+    with open(output_path(config, "metrics_jsonl"), "a") as f:
         f.write(json.dumps(record) + "\n")
-    with open("artifacts/run.log", "a") as f:
+    with open(output_path(config, "run_log"), "a") as f:
         f.write(f"{record['timestamp']} {record['phase']}: {record}\n")
 
 

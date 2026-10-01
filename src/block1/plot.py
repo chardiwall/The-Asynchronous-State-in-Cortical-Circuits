@@ -16,7 +16,7 @@ import numpy as np
 from block1.calibration import calibrate_synaptic_weights
 from block1.inputs import build_pair_inputs, mother_train_pool
 from block1.model import simulate_pair
-from config import load_config
+from config import load_config, output_path
 from lib.plotting import BLUE, ORANGE, scale_bar
 from lib.psc import synaptic_trace
 
@@ -182,17 +182,17 @@ if __name__ == "__main__":
     import sys
 
     config = load_config("config.yaml")
-    rows = load_full_pass_csv("artifacts/block1_full_pass.csv")
+    rows = load_full_pass_csv(output_path(config, "block1_sweep_csv"))
     plot_sweep([(rows["fig1b"], BLUE, "")], "p", "Shared input fraction p",
-               "Fig. 1B (E-only, r_in=0, L=10,000s)", "artifacts/fig1b.png")
+               "Fig. 1B (E-only, r_in=0, L=10,000s)", output_path(config, "block1_fig1b"))
     plot_sweep([(rows["fig1e_e_only"], BLUE, "E only"),
                 (rows["fig1e_e_plus_i"], ORANGE, "E and I")],
                "r_in", "Input spike correlation r_in",
-               "Fig. 1E (p=0.2, L=10,000s): E-only vs E+I", "artifacts/fig1e.png")
+               "Fig. 1E (p=0.2, L=10,000s): E-only vs E+I", output_path(config, "block1_fig1e"))
 
     # A few hundred ms of one trial -- these panels show shape, not a measurement.
     duration_ms = float(sys.argv[1]) if len(sys.argv) > 1 else 500.0
     rng = np.random.default_rng(config["seed"])
-    plot_fig1c(config, duration_ms, rng, "artifacts/fig1c.png")
-    plot_fig1f(config, duration_ms, rng, "artifacts/fig1f.png")
-    print("wrote fig1b/c/e/f.png to artifacts/")
+    plot_fig1c(config, duration_ms, rng, output_path(config, "block1_fig1c"))
+    plot_fig1f(config, duration_ms, rng, output_path(config, "block1_fig1f"))
+    print(f"wrote fig1b/c/e/f.png to {config['paths']['artifacts']}/")

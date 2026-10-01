@@ -21,8 +21,7 @@ from block3.measure import (
     spike_times_by_neuron,
 )
 from block3.model import build_network
-
-PANEL_DIR = "artifacts/block3_panels"
+from config import output_path
 
 
 def run_one_task(network_index: int, config: dict, duration_ms: float) -> dict:
@@ -117,7 +116,7 @@ def write_fig3a(spikes: dict, recorded_ms: float, config: dict, rng) -> None:
     n_e, n_i = len(spikes["E"]), len(spikes["I"])
     share_e = round(fig3a["raster_neurons"] * n_e / (n_e + n_i))
 
-    with open(f"{PANEL_DIR}/fig3a_raster.csv", "w", newline="") as f:
+    with open(output_path(config, "block3_fig3a_raster_csv"), "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["row", "population", "t_ms"])
         row = 0
@@ -133,7 +132,7 @@ def write_fig3a(spikes: dict, recorded_ms: float, config: dict, rng) -> None:
             "X": spikes["X"]}
     activity = {p: _z_score(binned_population_activity(flat[p], recorded_ms, bin_ms).astype(float))
                 for p in ("E", "I", "X")}
-    with open(f"{PANEL_DIR}/fig3a_tracking.csv", "w", newline="") as f:
+    with open(output_path(config, "block3_fig3a_tracking_csv"), "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["t_ms", "E", "I", "X"])
         writer.writerows([[k * bin_ms, activity["E"][k], activity["I"][k], activity["X"][k]]
@@ -159,7 +158,7 @@ def write_fig3b(spikes: dict, recorded_ms: float, config: dict, rng) -> None:
         for _ in range(net_config["fig3b"]["n_surrogate_sets"])
     ])
 
-    with open(f"{PANEL_DIR}/fig3b_correlations.csv", "w", newline="") as f:
+    with open(output_path(config, "block3_fig3b_correlations_csv"), "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["kind", "r"])
         writer.writerows([["measured", r] for r in measured])

@@ -13,11 +13,9 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from config import load_config
+from config import load_config, output_path
 
 GREEN, RED, BLUE, BLACK, GOLD = "#2ca02c", "#d62728", "#1f77b4", "#000000", "#d4a017"
-PANEL_DIR = "artifacts/block3_panels"
-OUT_DIR = "artifacts/block3_panels"
 
 
 def _read_csv(path: str) -> list[dict]:
@@ -25,12 +23,12 @@ def _read_csv(path: str) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-def plot_fig3a(out_path: str = f"{OUT_DIR}/fig3a.png") -> None:
+def plot_fig3a(raster_csv: str, tracking_csv: str, out_path: str) -> None:
     """Raster of the rate-sorted neuron sample (top) over the z-scored population
     activities that show E, I and X tracking one another (bottom).
     """
-    raster = _read_csv(f"{PANEL_DIR}/fig3a_raster.csv")
-    tracking = _read_csv(f"{PANEL_DIR}/fig3a_tracking.csv")
+    raster = _read_csv(raster_csv)
+    tracking = _read_csv(tracking_csv)
 
     by_row = defaultdict(list)
     population_of = {}
@@ -60,11 +58,11 @@ def plot_fig3a(out_path: str = f"{OUT_DIR}/fig3a.png") -> None:
     plt.close(fig)
 
 
-def plot_fig3b(out_path: str = f"{OUT_DIR}/fig3b.png") -> None:
+def plot_fig3b(correlations_csv: str, out_path: str) -> None:
     """Measured pairwise spike-count correlations (black) against their jittered-surrogate
     null (grey), on one shared set of bins so the widths are directly comparable.
     """
-    rows = _read_csv(f"{PANEL_DIR}/fig3b_correlations.csv")
+    rows = _read_csv(correlations_csv)
     measured = np.array([float(r["r"]) for r in rows if r["kind"] == "measured"])
     jittered = np.array([float(r["r"]) for r in rows if r["kind"] == "jittered"])
     measured, jittered = measured[np.isfinite(measured)], jittered[np.isfinite(jittered)]
@@ -112,8 +110,7 @@ def _mean_over_networks(rows: list[dict], value_key: str) -> tuple[np.ndarray, n
     return lags, np.array([np.nanmean(grouped[lag]) for lag in lags])
 
 
-def plot_fig3c(csv_path: str = "artifacts/block3_vm_ccg.csv",
-                out_path: str = f"{OUT_DIR}/fig3c.png") -> None:
+def plot_fig3c(csv_path: str, out_path: str) -> None:
     rows = _read_csv(csv_path)
     config = load_config("config.yaml")
     fig, ax = plt.subplots(figsize=(6, 4.5))
@@ -132,8 +129,7 @@ def plot_fig3c(csv_path: str = "artifacts/block3_vm_ccg.csv",
     plt.close(fig)
 
 
-def plot_fig3d(csv_path: str = "artifacts/block3_vm_ccg.csv",
-                out_path: str = f"{OUT_DIR}/fig3d.png") -> None:
+def plot_fig3d(csv_path: str, out_path: str) -> None:
     """Peak CCG height against the pair's mean holding potential.
 
     The paper's Fig. 3D is a V-shape that stays ENTIRELY NON-NEGATIVE: about +0.27 at the
@@ -171,9 +167,14 @@ def plot_fig3d(csv_path: str = "artifacts/block3_vm_ccg.csv",
 
 
 if __name__ == "__main__":
-    os.makedirs(OUT_DIR, exist_ok=True)
-    plot_fig3a()
-    plot_fig3b()
-    plot_fig3c()
-    plot_fig3d()
-    print(f"wrote fig3a/b/c/d.png to {OUT_DIR}/")
+    config = load_config("config.yaml")
+    panels_dir = output_path(config, "block3_panels_dir")
+    os.makedirs(panels_dir, exist_ok=True)
+    plot_fig3a(output_path(config, "block3_fig3a_raster_csv"),
+               output_path(config, "block3_fig3a_tracking_csv"),
+               output_path(config, "block3_fig3a"))
+    plot_fig3b(output_path(config, "block3_fig3b_correlations_csv"),
+               output_path(config, "block3_fig3b"))
+    plot_fig3c(output_path(config, "block3_vm_ccg_csv"), output_path(config, "block3_fig3c"))
+    plot_fig3d(output_path(config, "block3_vm_ccg_csv"), output_path(config, "block3_fig3d"))
+    print(f"wrote fig3a/b/c/d.png to {panels_dir}/")

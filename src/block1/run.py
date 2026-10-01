@@ -22,11 +22,10 @@ import numpy as np
 from analysis import StreamingCorrelation, spike_count_correlation
 from block1.calibration import calibrate_from_config, calibrate_synaptic_weights
 from block1.inputs import build_pair_inputs
-from config import load_config
+from config import load_config, output_path
 from lib.checks import check_increasing_trend
 from lib.chunking import simulate_pairs_batch_chunked
 
-CSV_PATH = "artifacts/block1_full_pass.csv"
 CSV_FIELDS = [
     "phase", "p", "r_in", "n_e", "n_i", "rate_hz", "c", "r_out",
     "duration_s", "elapsed_s", "timestamp",
@@ -147,7 +146,7 @@ def run_full_pass(config: dict, points: list[dict] | None = None) -> list[dict]:
     return rows
 
 
-def write_csv(rows: list[dict], path: str = CSV_PATH) -> None:
+def write_csv(rows: list[dict], path: str) -> None:
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         writer.writeheader()
@@ -164,7 +163,7 @@ def main():
         print(f"{condition}: input rate {rate:.5f} Hz gives ~5 Hz output at r_in = 0.\n"
               f"Put it in config.yaml and record the settings used.")
     elif command == "check":
-        rows = [dict(r) for r in csv.DictReader(open(CSV_PATH))]
+        rows = [dict(r) for r in csv.DictReader(open(output_path(config, "block1_sweep_csv")))]
         for phase in ("fig1b", "fig1e_e_only", "fig1e_e_plus_i"):
             sub = sorted((r for r in rows if r["phase"] == phase),
                          key=lambda r: float(r["p"] if phase == "fig1b" else r["r_in"]))
@@ -174,8 +173,9 @@ def main():
             print(f"{phase}: r_out increases with the swept parameter -> {ok}")
     elif command == "sweep":
         rows = run_full_pass(config)
-        write_csv(rows)
-        print(f"wrote {len(rows)} rows to {CSV_PATH}")
+        csv_path = output_path(config, "block1_sweep_csv")
+        write_csv(rows, csv_path)
+        print(f"wrote {len(rows)} rows to {csv_path}")
     else:
         raise SystemExit(f"unknown command {command!r}; expected sweep, calibrate or check")
 

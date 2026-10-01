@@ -62,9 +62,9 @@ flagged at the top of [`src/block3/README.md`](src/block3/README.md).
 
 | Path | Contents |
 |------|----------|
-| `config.yaml` | Every seed and model parameter, with per-block provenance back to the paper's SOM. Nothing numeric is hardcoded in Python |
+| `config.yaml` | Every seed, model parameter and output path, with per-block provenance back to the paper's SOM. Nothing numeric and no path is hardcoded in Python |
 | `src/analysis.py` | The shared measurement pipeline, used identically by every block |
-| `src/config.py` | The single `config.yaml` loader |
+| `src/config.py` | The `config.yaml` loader and `output_path`, the one place output locations are resolved |
 | `src/lib/` | Machinery: Numba kernels, Brian2 batching, chunking, Slurm-array bookkeeping, plotting helpers |
 | `src/block1/`, `src/block2/`, `src/block3/` | One directory per figure, each with its own README |
 | `slurm/` | Cluster job scripts, named by block and figure |
@@ -75,7 +75,7 @@ flagged at the top of [`src/block3/README.md`](src/block3/README.md).
 
 ```bash
 pip install -r requirements.txt
-pytest                                  # 164 tests
+pytest                                  # 169 tests
 python -m block1.run sweep              # see each block's README for the rest
 ```
 
@@ -90,10 +90,17 @@ Worth knowing before changing anything:
 - **Every numeric constant comes from `config.yaml`**, with a comment tracing it to the
   paper or marking it explicitly as an inference or a guard. If a value is not in
   `config.yaml`, it does not belong in the code.
+- **Every output path comes from `config.yaml` too.** `paths.artifacts` is the root and
+  `outputs` names each directory and fixed file; code resolves them through
+  `config.output_path(config, key)` rather than writing a literal. Point `paths.artifacts`
+  somewhere else and the whole run follows. The only paths composed in code are leaves the
+  code generates per item, such as `task_<i>.json` and `panel_<name>.csv`, inside a
+  directory resolved from config.
 - **Seeds are explicit.** `random`, `numpy` and the framework RNG are all set at startup
   from `config.yaml`'s `seed`.
 - **Tests come first**, and they pin behaviour at named seams rather than restating the
   implementation.
 - **Inferences are labelled as inferences.** Where the paper is silent or ambiguous, the
   code and `config.yaml` say so at the point of use instead of quietly choosing.
-- **`artifacts/` is the single output location.** Nothing else is written to.
+- **`artifacts/` is the single output location**, and it is configurable. Nothing is
+  written outside it.

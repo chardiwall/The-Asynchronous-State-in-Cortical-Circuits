@@ -26,12 +26,10 @@ from block2.measure import (
     population_averaged_correlation,
 )
 from block2.model import predicted_rates, simulate
-from config import load_config
+from config import load_config, output_path
 from lib.glauber import simulate_fast_current, simulate_fast_one
 from lib.tasks import aggregate_task_rows, size_repeat_grid, write_task_row
 
-EXPLORE_CSV = "artifacts/block2_exploratory_pass.csv"
-SWEEP_DIR, CURRENT_DIR = "artifacts/block2_full_pass", "artifacts/block2_full_pass_current"
 SWEEP_FIELDS = ["n", "realisation", "rate_E", "rate_I", "rate_X",
                 "r_EE", "r_II", "r_EI", "r_EX", "r_IX"]
 CURRENT_FIELDS = ["n", "realisation", "c_EE", "c_II", "c_XX", "c_EI", "c_EX", "c_IX", "c_total"]
@@ -142,11 +140,12 @@ def main():
     if command == "explore":
         config = load_config("config.yaml")
         rows = [run_one_size(n, config) for n in config["binary_network"]["exploratory"]["sizes"]]
-        with open(EXPLORE_CSV, "w", newline="") as f:
+        explore_csv = output_path(config, "block2_explore_csv")
+        with open(explore_csv, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=EXPLORE_FIELDS)
             writer.writeheader()
             writer.writerows(rows)
-        print(f"wrote {len(rows)} rows to {EXPLORE_CSV}")
+        print(f"wrote {len(rows)} rows to {explore_csv}")
 
     elif command in ("sweep", "current"):
         index = int(sys.argv[2])
@@ -157,17 +156,22 @@ def main():
                       sampling_rate=net["sampling_rate_instantaneous"],
                       burn_in_tau=net["burn_in_tau"], seed=config["seed"])
         if command == "sweep":
-            write_task_row(SWEEP_DIR, f"{index:04d}", run_one_task(**shared))
+            write_task_row(output_path(config, "block2_sweep_dir"), f"{index:04d}",
+                           run_one_task(**shared))
         else:
-            write_task_row(CURRENT_DIR, f"{index:04d}",
+            write_task_row(output_path(config, "block2_current_dir"), f"{index:04d}",
                            run_one_current_task(**shared,
                                                 subsample_size=net["fig2g_subsample_neurons"]))
 
     elif command == "aggregate":
+        config = load_config("config.yaml")
         by_realisation = lambda r: (r["n"], r["realisation"])
-        for directory, out, fields in ((SWEEP_DIR, "artifacts/block2_full_pass.csv", SWEEP_FIELDS),
-                                       (CURRENT_DIR, "artifacts/block2_full_pass_current.csv",
-                                        CURRENT_FIELDS)):
+        for directory, out, fields in (
+            (output_path(config, "block2_sweep_dir"),
+             output_path(config, "block2_sweep_csv"), SWEEP_FIELDS),
+            (output_path(config, "block2_current_dir"),
+             output_path(config, "block2_current_csv"), CURRENT_FIELDS),
+        ):
             print(f"{out}: {aggregate_task_rows(directory, out, fields, by_realisation)} rows")
 
     elif command == "panels":

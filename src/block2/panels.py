@@ -11,15 +11,13 @@ import numpy as np
 
 from block2.connectivity import couplings
 from block2.measure import COMPONENT_KEYS, current_component_ccg
+from config import output_path
 from lib.glauber import simulate_fast_current
 from lib.glauber_panels import (
     population_mean_trace,
     single_cell_components_trace,
     subsample_state_trace,
 )
-
-OUT_DIR = "artifacts/block2_illustrative"
-
 
 def _settings(config: dict):
     """(binary_network config, j couplings, illustrative-panel windows, largest fixed N).
@@ -31,9 +29,12 @@ def _settings(config: dict):
     return net, couplings(net), net["illustrative_panels"], net["sizes_fixed"][-1]
 
 
-def _write(name: str, header: list[str], rows) -> None:
-    os.makedirs(OUT_DIR, exist_ok=True)
-    with open(f"{OUT_DIR}/panel_{name}.csv", "w", newline="") as f:
+def _write(config: dict, name: str, header: list[str], rows) -> None:
+    # panel_<name>.csv is composed here rather than named in config.yaml: `name` is the
+    # subcommand's argument (b/d/e/g), so the directory is configured, the leaf is derived.
+    out_dir = output_path(config, "block2_panels_dir")
+    os.makedirs(out_dir, exist_ok=True)
+    with open(f"{out_dir}/panel_{name}.csv", "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
@@ -49,7 +50,7 @@ def generate_panel_b(config: dict) -> None:
         burn_in_tau=net["burn_in_tau"], seed=config["seed"], cell_index=0,
     )
     dt_ms = net["tau_ms"] / sr
-    _write("b", ["t_ms", "E", "I", "X", "Total"],
+    _write(config, "b", ["t_ms", "E", "I", "X", "Total"],
            ([k * dt_ms, *trace[:, k]] for k in range(trace.shape[1])))
 
 
@@ -66,7 +67,7 @@ def generate_panel_d(config: dict) -> None:
             burn_in_tau=net["burn_in_tau"], seed=config["seed"],
         )
         rows += [[n, k * dt_ms, *trace[:, k]] for k in range(trace.shape[1])]
-    _write("d", ["n", "t_ms", "E", "I", "X"], rows)
+    _write(config, "d", ["n", "t_ms", "E", "I", "X"], rows)
 
 
 def generate_panel_e(config: dict) -> None:
@@ -95,7 +96,7 @@ def generate_panel_e(config: dict) -> None:
         ccg = current_component_ccg(components, max_lag)
         rows += [[n, lag * dt_ms, *(ccg[f][k] for f in fields)]
                  for k, lag in enumerate(range(-max_lag, max_lag + 1))]
-    _write("e", ["n", "lag_ms", *fields], rows)
+    _write(config, "e", ["n", "lag_ms", *fields], rows)
 
 
 def generate_panel_g(config: dict) -> None:
@@ -108,7 +109,7 @@ def generate_panel_g(config: dict) -> None:
         seed=config["seed"], subsample_size=net["fig2g_subsample_neurons"],
     )
     corr = np.corrcoef(trace)
-    _write("g", ["r"], ([r] for r in corr[np.triu_indices_from(corr, k=1)]))
+    _write(config, "g", ["r"], ([r] for r in corr[np.triu_indices_from(corr, k=1)]))
 
 
 GENERATORS = {"b": generate_panel_b, "d": generate_panel_d,

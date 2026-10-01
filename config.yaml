@@ -12,9 +12,50 @@ paths:
     # DECLARATIVE ONLY -- the run scripts write "artifacts/..." directly; editing this key
     # does not redirect them. Wire it through before relying on it.
 
+# Output locations. Every directory and every fixed output file is named here, so no path
+# is hardcoded in Python and changing `paths.artifacts` redirects all of it. Paths are
+# relative to `paths.artifacts`. Filenames the code generates per item (task_<i>.json,
+# panel_<name>.csv) are composed in code from a directory resolved here.
+outputs:
+  # Block 1 (Fig. 1)
+  block1_sweep_csv: block1_full_pass.csv
+  block1_fig1b: fig1b.png
+  block1_fig1c: fig1c.png
+  block1_fig1e: fig1e.png
+  block1_fig1f: fig1f.png
+  # Block 2 (Fig. 2). The *_dir entries hold one JSON per Slurm array task, which
+  # `block2.run aggregate` stitches into the matching *_csv.
+  block2_explore_csv: block2_exploratory_pass.csv
+  block2_sweep_dir: block2_full_pass
+  block2_sweep_csv: block2_full_pass.csv
+  block2_current_dir: block2_full_pass_current
+  block2_current_csv: block2_full_pass_current.csv
+  block2_panels_dir: block2_illustrative
+  block2_fig2b: block2_illustrative/fig2b.png
+  block2_fig2c: block2_illustrative/fig2c.png
+  block2_fig2d: block2_illustrative/fig2d.png
+  block2_fig2e: block2_illustrative/fig2e.png
+  block2_fig2g: block2_illustrative/fig2g.png
+  # Block 3 (Fig. 3)
+  block3_networks_dir: block3_full_pass
+  block3_networks_csv: block3_full_pass.csv
+  block3_panels_dir: block3_panels
+  block3_fig3a_raster_csv: block3_panels/fig3a_raster.csv
+  block3_fig3a_tracking_csv: block3_panels/fig3a_tracking.csv
+  block3_fig3b_correlations_csv: block3_panels/fig3b_correlations.csv
+  block3_vm_ccg_dir: block3_vm_ccg
+  block3_vm_ccg_csv: block3_vm_ccg.csv
+  block3_fig3a: block3_panels/fig3a.png
+  block3_fig3b: block3_panels/fig3b.png
+  block3_fig3c: block3_panels/fig3c.png
+  block3_fig3d: block3_panels/fig3d.png
+  # Shared run log and metrics stream
+  metrics_jsonl: metrics.jsonl
+  run_log: run.log
+
 logging:
-  metrics_file: artifacts/metrics.jsonl
-  log_file: artifacts/run.log
+  # The two log paths live in `outputs` above (metrics_jsonl, run_log) so every output
+  # location is in one place.
   log_every_n_iterations: 1    # loss + NaN check logged every iteration
 
 # ---------------------------------------------------------------------------

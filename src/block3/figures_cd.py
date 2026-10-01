@@ -30,7 +30,6 @@ from analysis import lagged_correlation
 from block3.measure import recorded_pairs, sample_neuron_subset, signed_peak
 from block3.model import build_network
 
-RESULTS_DIR = "artifacts/block3_vm_ccg"
 UNREACHABLE_THRESHOLD_mV = 1e6  # far above any voltage this conductance-based model reaches
 
 

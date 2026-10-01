@@ -18,10 +18,9 @@ import numpy as np
 
 from block3 import figures_ab, figures_cd
 from block3.model import build_network
-from config import load_config
+from config import load_config, output_path
 from lib.tasks import aggregate_task_rows, write_task_row
 
-NETWORK_DIR, VM_DIR = "artifacts/block3_full_pass", "artifacts/block3_vm_ccg"
 NETWORK_FIELDS = ["network_index", "rate_excitatory_hz", "rate_inhibitory_hz",
                   "r_bar_EE", "nan_free"]
 
@@ -52,7 +51,7 @@ def main():
         index = int(sys.argv[2])
         duration_ms = parse_length_s(
             ["run", "-", *sys.argv[3:]], net_config["simulation"]["length_s"]) * 1000.0
-        write_task_row(NETWORK_DIR, f"{index:04d}",
+        write_task_row(output_path(config, "block3_networks_dir"), f"{index:04d}",
                        figures_ab.run_one_task(index, config, duration_ms))
 
     elif command == "panels":
@@ -64,7 +63,7 @@ def main():
         # Checked BEFORE the network is built: the failure would otherwise land after a
         # multi-day simulation with nothing written.
         projected_gb = figures_ab.check_rate_matrix_fits(config, length_s)
-        os.makedirs(figures_ab.PANEL_DIR, exist_ok=True)
+        os.makedirs(output_path(config, "block3_panels_dir"), exist_ok=True)
         print(f"Fig. 3B rate matrix will be ~{projected_gb:.2f}GB", flush=True)
 
         rng = np.random.default_rng(config["seed"])
@@ -75,7 +74,8 @@ def main():
         recorded_ms = duration_ms - net_config["burn_in_ms"]
         figures_ab.write_fig3a(spikes, recorded_ms, config, rng)
         figures_ab.write_fig3b(spikes, recorded_ms, config, rng)
-        print(f"Fig. 3A/3B data written to {figures_ab.PANEL_DIR}/ ({length_s}s run)")
+        print(f"Fig. 3A/3B data written to "
+              f"{output_path(config, 'block3_panels_dir')}/ ({length_s}s run)")
 
     elif command == "vm":
         if len(sys.argv) > 4:
@@ -84,11 +84,15 @@ def main():
             task = figures_cd.build_task_grid(config)[int(sys.argv[2])]
             index, a, b = task["network_index"], task["i_app_a_nA"], task["i_app_b_nA"]
         row = figures_cd.run_one_task(index, a, b, config)
-        write_task_row(VM_DIR, f"{index:02d}_{a}_{b}", row)
+        write_task_row(output_path(config, "block3_vm_ccg_dir"), f"{index:02d}_{a}_{b}", row)
 
     elif command == "aggregate":
-        print(f"{aggregate_task_rows(NETWORK_DIR, 'artifacts/block3_full_pass.csv', NETWORK_FIELDS, lambda r: r['network_index'])} network rows")
-        figures_cd.aggregate_vm_ccg(VM_DIR, "artifacts/block3_vm_ccg.csv")
+        networks = aggregate_task_rows(output_path(config, "block3_networks_dir"),
+                                       output_path(config, "block3_networks_csv"),
+                                       NETWORK_FIELDS, lambda r: r["network_index"])
+        print(f"{networks} network rows")
+        figures_cd.aggregate_vm_ccg(output_path(config, "block3_vm_ccg_dir"),
+                                    output_path(config, "block3_vm_ccg_csv"))
 
     elif command == "plot":
         from block3 import plot
