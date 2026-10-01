@@ -117,3 +117,40 @@ def test_averaging_multiple_trials_reduces_single_run_noise_sensitivity():
         [_measure_output_rate_hz(calibrated_rate_hz, seed=1001 + i) for i in range(3)]
     )
     assert verification_hz == pytest.approx(5.0, abs=2.0)
+
+
+def test_both_conditions_are_calibrated_to_the_same_output_rate():
+    """Fig. 1E's two curves must share an operating point -- the caption describes the E+I
+    condition as having "identical statistics" to the E-only one. The paper states 20
+    spikes/s input for E+I and claims it produces 5 spikes/s output; measured here it
+    produces about 10.5, so the input was recalibrated instead (config.yaml records the
+    full finding). This pins that both calibrated rates are present and that the E+I rate
+    is the calibrated one rather than the paper's stated value.
+    """
+    from config import load_config
+
+    inputs = load_config("config.yaml")["pair_model"]["inputs"]
+
+    assert inputs["rate_e_only_calibrated_hz"] is not None
+    assert inputs["rate_e_plus_i_calibrated_hz"] is not None
+    assert inputs["rate_e_plus_i_calibrated_hz"] != inputs["rate_correlated_sweep_hz"]
+
+
+def test_the_sweep_grid_uses_the_calibrated_e_plus_i_rate():
+    """build_sweep_points must raise rather than silently fall back to the paper's 20 Hz,
+    which would put Fig. 1E's two curves at ~5 and ~10.5 spikes/s output.
+    """
+    import copy
+
+    from block1.full_pass import build_sweep_points
+    from config import load_config
+
+    config = load_config("config.yaml")
+    points = build_sweep_points(config)
+    e_plus_i = {p["rate_hz"] for p in points if p["phase"] == "fig1e_e_plus_i"}
+    assert e_plus_i == {config["pair_model"]["inputs"]["rate_e_plus_i_calibrated_hz"]}
+
+    unset = copy.deepcopy(config)
+    unset["pair_model"]["inputs"]["rate_e_plus_i_calibrated_hz"] = None
+    with pytest.raises(ValueError, match="rate_e_plus_i_calibrated_hz"):
+        build_sweep_points(unset)

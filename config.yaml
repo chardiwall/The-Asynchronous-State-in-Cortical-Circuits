@@ -37,17 +37,21 @@ pair_model:
     rate_correlated_sweep_hz: 20.0   # Fig. 1C,E-F E+I condition, the paper's STATED value.
       # UNUSED for Fig. 1E as of 2026-09-30 -- see rate_e_plus_i_calibrated_hz below. Kept
       # because it is what the paper says, so the discrepancy stays visible.
-    rate_e_plus_i_calibrated_hz: null   # TO BE DERIVED -- run:
-      #   PYTHONPATH=src .env/bin/python -m block1.calibrate_rate e_plus_i
-      # then paste the printed value here with the settings used, as was done for the
-      # E-only rate below. Resolves ambiguity 3 (found 2026-09-30): the SOM states "The
+    rate_e_plus_i_calibrated_hz: 15.625  # DERIVED 2026-10-01 by bisection
+      # (block1.calibrate_rate e_plus_i, settings in pair_model.calibration_rate below:
+      # 5 trials x 120 s per candidate, tolerance 0.18 Hz against a 0.09 Hz standard error).
+      # Resolves ambiguity 3 (found 2026-09-30): the SOM states "The
       # input firing rate was set to 20 spikes/s TO PRODUCE AN OUTPUT RATE OF 5 spikes/s
       # when r_in = 0", but 20 spikes/s measured 12.05 +- 2.57 Hz out with these
       # parameters. PSP calibration, analytic mean drive and free-membrane statistics each
       # check out independently, so the paper's two numbers are mutually inconsistent here.
       # Researcher's call: honour the stated OUTPUT rate and recalibrate the input, so both
       # Fig. 1E curves share an operating point ("identical statistics", per the caption).
-      # block1.full_pass must raise rather than run while this is null.
+      # block1.full_pass raises rather than run while this is null.
+      #
+      # Re-derive this whenever n_excitatory, n_inhibitory, tau_m_ms, the PSP amplitudes or
+      # the threshold change -- like the E-only rate below, it is a property of the whole
+      # operating point, not a free parameter.
     rate_e_only_calibrated_hz: 4.04297   # Fig. 1E E-only curve -- resolves ambiguity 1
       # (docs/paper/01-postsynaptic-pair.md): the paper's 20Hz is E+I-only; the E-only rate
       # isn't stated, so it's calibrated by bisection (block1.calibrate_rate) to give 5Hz
@@ -86,14 +90,23 @@ pair_model:
       # this value was first set for; kept smaller here (500s not 2000s) to keep peak RSS
       # well under the DGX's 121GB even with that wider batching.
   calibration_rate:             # bisection settings for block1.calibrate_rate. NOT paper
-    # values -- these are search parameters for resolving the two input-rate ambiguities.
-    duration_ms: 20000.0        # per trial; long enough that a ~5Hz output is ~100 spikes
-    rate_low_hz: 0.5            # search bracket; must straddle the target output rate
-    rate_high_hz: 60.0
-    tolerance_hz: 0.05          # accept when the measured output is this close to target
-    max_iterations: 40
-    n_trials: 5                 # independent replicates averaged per candidate rate, so
-      # Monte Carlo noise cannot violate bisection's monotonicity assumption
+    # values -- search parameters for resolving the two input-rate ambiguities. Sized from
+    # a measurement, not guessed: an output-rate estimate is a noisy Monte Carlo quantity,
+    # so the tolerance MUST sit above its standard error or bisection makes its bracket
+    # decisions on noise and "converges" at a random point inside it.
+    #
+    # Measured 2026-10-01 at the E+I operating point: output ~5 Hz is reached near 15.3 Hz
+    # input, with a local slope of 0.92 Hz-out per Hz-in, so input uncertainty is about
+    # 1.1x the output tolerance. SE of the mean scales as sqrt(target / (duration*n_trials)),
+    # giving SE ~= 0.09 Hz at the values below -- half the tolerance, as it should be.
+    # An earlier version of this stanza used duration 20 s and tolerance 0.05 Hz, where the
+    # SE was 5.1x the tolerance; that would not have converged honestly.
+    duration_ms: 120000.0       # per trial; ~600 spikes at a 5 Hz output
+    rate_low_hz: 10.0           # bracket, from the scan above: 10 Hz in -> 0.84 Hz out,
+    rate_high_hz: 25.0          # 25 Hz in -> well above 5. Must straddle the target.
+    tolerance_hz: 0.18          # ~2x the SE; corresponds to ~0.2 Hz of input precision
+    max_iterations: 40          # the bracket needs only ~7 halvings to reach 0.2 Hz
+    n_trials: 5                 # independent replicates averaged per candidate rate
   calibration_check:            # single-spike PSP verification harness (Phase 1 self-check),
     dt_ms: 0.01                 # distinct from the production sweep's dt/length above --
     duration_ms: 50.0           # this only needs to resolve one ~7ms-peaked PSP cleanly
