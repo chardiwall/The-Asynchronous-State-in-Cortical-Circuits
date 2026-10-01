@@ -1,5 +1,5 @@
 """Seam: simulate_fast_current -- wraps _run_jit_current with connectivity construction and
-a random E-cell subsample, the production entry point block2.full_pass_current uses per
+a random E-cell subsample, the production entry point block2.run uses per
 realisation. Only E cells are recorded: the decomposition is over the components of one
 cell's current, so I cells are not needed for it.
 """

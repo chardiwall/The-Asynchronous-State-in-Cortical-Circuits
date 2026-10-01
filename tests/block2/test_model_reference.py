@@ -7,7 +7,7 @@ import numpy as np
 
 from block2.connectivity import build_weights
 from block2.model import tick
-from block2.simulate import simulate
+from block2.model import simulate
 
 J = {"EE": 1.0, "EI": -1.0, "EX": 1.0, "IE": 1.0, "II": -1.0, "IX": 1.0}
 COMMON = dict(n=4, p=0.5, j=J, m_x=0.3, theta=0.5)

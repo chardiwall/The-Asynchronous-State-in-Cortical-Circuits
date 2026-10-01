@@ -6,7 +6,7 @@ solutions of the 2x2 linear system, independent of the code under test.
 """
 import pytest
 
-from block2.theory import predicted_rates
+from block2.model import predicted_rates
 
 
 def test_this_projects_actual_parameters_predict_matched_rates():

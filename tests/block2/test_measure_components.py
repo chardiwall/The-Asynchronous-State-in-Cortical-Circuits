@@ -7,7 +7,7 @@ current correlation; if they don't, they are not a decomposition of anything.
 import numpy as np
 import pytest
 
-from block2.eval import (
+from block2.measure import (
     current_component_ccg,
     current_component_correlations,
     population_averaged_correlation,

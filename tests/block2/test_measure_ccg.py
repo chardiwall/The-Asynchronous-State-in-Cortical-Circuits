@@ -6,7 +6,7 @@ of a, giving a hand-predictable peak lag independent of the code under test.
 """
 import numpy as np
 
-from block2.eval import population_averaged_ccg
+from block2.measure import population_averaged_ccg
 
 RNG = np.random.default_rng(0)
 A = RNG.integers(0, 2, size=(4, 50)).astype(np.float64)

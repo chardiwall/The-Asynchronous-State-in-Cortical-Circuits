@@ -1,6 +1,6 @@
 """Fig. 2C: the log-log N-sweep of every correlation this block measures. Reads the two
-aggregated CSVs (block2.full_pass --aggregate and block2.full_pass_current --aggregate),
-unlike the other four panels, which read block2.illustrative_panels' short per-panel runs.
+aggregated CSVs (block2.run --aggregate and block2.run --aggregate),
+unlike the other four panels, which read block2.panels' short per-panel runs.
 
 This is the block's central result: r_bar falling along 1/N while c falls along 1/sqrt(N)
 and the components stay O(1).
@@ -10,7 +10,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from block2.plot_fig2 import BLACK, BLUE, GREEN, ORANGE, OUT_DIR, RED, _read_csv
+from block2.plot import BLACK, BLUE, GREEN, ORANGE, OUT_DIR, RED, _read_csv
 
 
 def _label(name: str) -> str:
@@ -48,7 +48,7 @@ def plot_fig2c(
     current components versus N, log-log, with the paper's 1/N and 1/sqrt(N) guide lines.
 
     Components of one cell's current, not currents of different populations of cells --
-    see block2.eval.current_component_correlations. c_EI, c_EX and c_IX are negative (they
+    see block2.measure.current_component_correlations. c_EI, c_EX and c_IX are negative (they
     are what cancels the positive c_EE + c_II + c_XX), and a log axis cannot show a
     negative value, so every series is drawn at |value| with negative points marked as
     hollow rather than silently mirrored into apparent signal.

@@ -4,11 +4,11 @@ simulations, so nothing is plotted for them.
 Color code is the paper's own Fig. 2B legend, reused by 2C/2D/2E ("Color code as in
 (B)/(C)"): E green, I red, X blue, Total black, and the mixed EI quantity orange.
 
-2B/2D/2E/2G read block2.illustrative_panels' per-panel CSVs. Fig. 2C is different in kind
+2B/2D/2E/2G read block2.panels' per-panel CSVs. Fig. 2C is different in kind
 -- it reads the two aggregated full-pass CSVs -- so it lives in plot_fig2_sweep.py; running
 this module draws all five.
 
-Usage: python -m block2.plot_fig2
+Usage: python -m block2.plot
 """
 import csv
 from collections import defaultdict
@@ -146,7 +146,7 @@ def plot_fig2g(csv_path: str = f"{OUT_DIR}/panel_g.csv", out_path: str = f"{OUT_
 
 
 if __name__ == "__main__":
-    from block2.plot_fig2_sweep import plot_fig2c
+    from block2.plot_sweep import plot_fig2c
 
     plot_fig2b()
     plot_fig2c()

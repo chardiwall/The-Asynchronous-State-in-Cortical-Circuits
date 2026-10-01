@@ -1,25 +1,22 @@
-"""Raw data for Fig. 2's illustrative single-realisation panels (2B, 2D, 2E, 2G).
-block2.full_pass / full_pass_current cover 2C's ensemble statistics; these four panels
-show qualitative shape instead, so they run short windows
-(config.yaml binary_network.illustrative_panels) and need no DGX.
+"""Raw data for Fig. 2's illustrative panels (2B, 2D, 2E, 2G).
 
-Usage: python -m block2.illustrative_panels {b,d,e,g}
+These show qualitative shape rather than ensemble precision -- 2C's sweeps already cover
+that -- so they run short windows (config.yaml binary_network.illustrative_panels) and need
+no cluster. Driven by `python -m block2.run panels {b,d,e,g}`.
 """
 import csv
 import os
-import sys
 
 import numpy as np
 
 from block2.connectivity import couplings
-from block2.eval import COMPONENT_KEYS, current_component_ccg
+from block2.measure import COMPONENT_KEYS, current_component_ccg
 from lib.glauber import simulate_fast_current
 from lib.glauber_panels import (
     population_mean_trace,
     single_cell_components_trace,
     subsample_state_trace,
 )
-from config import load_config
 
 OUT_DIR = "artifacts/block2_illustrative"
 
@@ -114,14 +111,5 @@ def generate_panel_g(config: dict) -> None:
     _write("g", ["r"], ([r] for r in corr[np.triu_indices_from(corr, k=1)]))
 
 
-GENERATORS = {"b": generate_panel_b, "d": generate_panel_d, "e": generate_panel_e, "g": generate_panel_g}
-
-
-def main():
-    panel = sys.argv[1]
-    GENERATORS[panel](load_config("config.yaml"))
-    print(f"panel {panel} data written to {OUT_DIR}/panel_{panel}.csv")
-
-
-if __name__ == "__main__":
-    main()
+GENERATORS = {"b": generate_panel_b, "d": generate_panel_d,
+              "e": generate_panel_e, "g": generate_panel_g}

@@ -4,7 +4,7 @@ current, plus the total they must sum to.
 """
 import pytest
 
-from block2.full_pass_current import run_one_current_task
+from block2.run import run_one_current_task
 
 J = {"EE": 1.0, "EI": -1.0, "EX": 1.0, "IE": 1.0, "II": -1.0, "IX": 1.0}
 

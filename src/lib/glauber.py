@@ -25,7 +25,22 @@ import numpy as np
 from numba import njit
 
 from block2.connectivity import build_weights_stacked
-from block2.simulate import _ticks_per_sample
+
+
+def ticks_between_samples(n: int, sampling_rate: int) -> int:
+    """3n elementary steps make one tau, so a sample every tau/sampling_rate needs
+    3n/sampling_rate steps. Raises rather than truncating: at SR=16 and n=100 the integer
+    division silently gives 0.96 tau per sample, a 4% error that mis-scales every CCG lag
+    axis (and hence the reported EI-Lag) with no warning. Exact for the sizes actually
+    used at SR=16 (sizes_fixed = 1024, 8192) and for every SR=1 path.
+    """
+    if (3 * n) % sampling_rate != 0:
+        raise ValueError(
+            f"sampling_rate={sampling_rate} does not divide 3*n={3 * n}, so the recorded "
+            f"time base would be off by {100 * (1 - (3 * n // sampling_rate) * sampling_rate / (3 * n)):.2f}%. "
+            f"Pick an n for which 3n is a multiple of the sampling rate."
+        )
+    return (3 * n) // sampling_rate
 
 
 @njit
@@ -125,7 +140,7 @@ def simulate_fast_one(
     """
     n_samples = length_tau * sampling_rate
     ticks_per_tau = 3 * n
-    ticks_per_sample = _ticks_per_sample(n, sampling_rate)
+    ticks_per_sample = ticks_between_samples(n, sampling_rate)
     burn_in_ticks = burn_in_tau * ticks_per_tau
 
     rng = np.random.default_rng(seed)
@@ -146,7 +161,7 @@ def simulate_fast_current(
     """
     n_samples = length_tau * sampling_rate
     ticks_per_tau = 3 * n
-    ticks_per_sample = _ticks_per_sample(n, sampling_rate)
+    ticks_per_sample = ticks_between_samples(n, sampling_rate)
     burn_in_ticks = burn_in_tau * ticks_per_tau
 
     rng = np.random.default_rng(seed)

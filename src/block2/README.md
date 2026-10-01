@@ -16,7 +16,7 @@ All commands are from the **repo root** with `PYTHONPATH=src`.
 ### Step 1 — validate against the closed-form theory (local, minutes)
 
 ```bash
-PYTHONPATH=src .env/bin/python -m block2.exploratory_pass
+PYTHONPATH=src .env/bin/python -m block2.run
 ```
 
 Small `N`, short runs, checked against S-Eq(18)'s predicted rates and S-Eq(28–29)'s
@@ -41,25 +41,25 @@ sbatch --array=337-346%13 --mem=9G slurm/block2_sweep.slurm
 sbatch --mem=6G slurm/block2_sweep_current.slurm
 
 # Once BOTH jobs have fully finished:
-PYTHONPATH=src .env/bin/python -m block2.full_pass --aggregate
-PYTHONPATH=src .env/bin/python -m block2.full_pass_current --aggregate
+PYTHONPATH=src .env/bin/python -m block2.run --aggregate
+PYTHONPATH=src .env/bin/python -m block2.run --aggregate
 ```
 
 A single task can be run directly, which is how to test before submitting:
-`PYTHONPATH=src .env/bin/python -m block2.full_pass 0`
+`PYTHONPATH=src .env/bin/python -m block2.run 0`
 
 ### Step 3 — the illustrative panels (local, minutes)
 
 ```bash
 for panel in b d e g; do
-  PYTHONPATH=src .env/bin/python -m block2.illustrative_panels $panel
+  PYTHONPATH=src .env/bin/python -m block2.panels $panel
 done
 ```
 
 ### Step 4 — plot everything
 
 ```bash
-PYTHONPATH=src .env/bin/python -m block2.plot_fig2
+PYTHONPATH=src .env/bin/python -m block2.plot
 ```
 
 Writes `fig2b/c/d/e/g.png` to `artifacts/block2_illustrative/`. 2C reads the two aggregated

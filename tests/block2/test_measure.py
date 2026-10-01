@@ -7,7 +7,7 @@ mix), independent of np.corrcoef's own correctness.
 import numpy as np
 import pytest
 
-from block2.eval import population_averaged_correlation
+from block2.measure import population_averaged_correlation
 
 SAMPLES_A = np.array([
     [0, 1, 0, 1],
