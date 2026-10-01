@@ -11,8 +11,11 @@ One task = one network at one ORDERED pair of current levels. Ten E cells are he
 level with spiking disabled, and every within-A, within-B and cross pair's CCG is averaged.
 With a == b that gives Fig. 3D's point for that level (45 pairs x 10 networks = 450); with
 a = the EPSP level and b = the IPSP level it gives Fig. 3C's gold curve (100 x 10 = 1000).
-docs/adr/0006 records why ten cells per condition, and why conditions are not all recorded
-in one run.
+Ten cells per level is DERIVED, not stated: it is the only simple scheme reproducing both
+of the SOM's pair counts (see config.yaml: fig3cd.n_recorded_cells_per_condition). Cells
+with spiking disabled stop driving their targets, and that perturbation grows with the
+number of conditions recorded at once, so one task runs ONE condition pair rather than all
+eight levels at once.
 
 Usage (one Slurm array task): python -m block3.figures_cd <task_index>
 Usage (one explicit run):     python -m block3.figures_cd <network_index> <i_app_a> <i_app_b>

@@ -1,4 +1,4 @@
-"""S-Eq(1): connectivity for the recurrent binary network (Fig. 2, docs/paper/02-binary-network.md).
+"""S-Eq(1): connectivity for the recurrent binary network (Fig. 2; SOM S1, S-p.3-17).
 
 Each ordered population pair (post alpha <- pre beta) gets an independent Bernoulli(p) draw
 per entry: J_ij = j_ab/sqrt(n) with probability p, else 0. Within-population pairs (EE, II)

@@ -1,5 +1,5 @@
 """Seam: resample_gaussian_conductances -- block 3's per-synapse peak conductances
-(docs/paper/03-recurrent-spiking-network.md, ADR 0004)."""
+(SOM S2.1.2, S-p.20-21)."""
 import numpy as np
 import pytest
 from scipy.stats import truncnorm
@@ -59,7 +59,7 @@ def test_a_naive_truncated_gaussian_would_fail_the_above():
 
 def test_delays_are_within_range_and_on_the_005ms_grid():
     # Excitatory-origin delays: U[0.5, 1.5] ms, sampled at 0.05 ms resolution
-    # (docs/paper/03-recurrent-spiking-network.md).
+    # (SOM S2.1.2, S-p.20-21).
     delays = sample_delays_ms(
         n=50_000, low_ms=0.5, high_ms=1.5, resolution_ms=0.05, rng=np.random.default_rng(3)
     )
@@ -70,7 +70,7 @@ def test_delays_are_within_range_and_on_the_005ms_grid():
 
 
 def test_connectivity_density_converges_to_p_cross_population():
-    # PROGRESS.md Phase 2: connectivity generated in numpy, before any Brian2 object, so
+    # Connectivity is generated in numpy, before any Brian2 object exists, so
     # cpp_standalone doesn't need to read anything back at construction time.
     n_pre, n_post, p = 400, 100, 0.2
     pre_idx, post_idx = generate_bernoulli_connectivity(

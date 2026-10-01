@@ -13,7 +13,7 @@ J_E_MV = 3.0
 J_I_MV = 3.0
 DT_MS = 0.01
 
-# TimedArray's zero-order-hold bias (ADR 0002): O(dt/tau_s). Derived from the formula
+# TimedArray's zero-order-hold bias: O(dt/tau_s). Derived from the formula
 # rather than a hand-picked constant. Observed bias was ~0.1% at DT_MS/TAU_S_MS (0.2%);
 # safety_factor of 3x comfortably covers that without missing a real regression.
 ZOH_BIAS_REL_TOL = 3 * DT_MS / TAU_S_MS

@@ -103,9 +103,9 @@ and 2G. Change it and all four follow.
 This block has cost several days to memory problems. Two things are now true and should
 stay true:
 
-1. **`--mem` must be set per size tier** for `full_pass.slurm`. A flat value sized for
+1. **`--mem` must be set per size tier** for `block2_sweep.slurm`. A flat value sized for
    `N=8192` throttles the whole grid to about 11-way concurrency when most tasks need
-   megabytes; a value too small causes real OOM kills, not queuing. `full_pass_current.slurm`
+   megabytes; a value too small causes real OOM kills, not queuing. `block2_sweep_current.slurm`
    is different — it records a fixed-size subsample, so one `--mem=6G` covers every `N`.
 2. **Size `--mem` from a ground-truth measurement** (`/usr/bin/time -v` over a *complete*
    run), never from a short snapshot. Short snapshots underestimated the true peak twice in

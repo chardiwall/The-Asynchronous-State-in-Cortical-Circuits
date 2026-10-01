@@ -10,33 +10,30 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 
-# Generated outputs — data/raw is tracked as read-only source, these are not
-data/processed/*
-!data/processed/.gitkeep
+# Generated outputs -- artifacts/ is the single output location, and its contents are
+# reproducible from the code, so they are not tracked.
 artifacts/*
 !artifacts/.gitkeep
 
-.claude/
-
-
-# Large raw datasets (N-MNIST, DVS-Gesture) — keep the directory, not the contents
-data/raw/*
-!data/raw/.gitkeep
-
-# Paper source and personal reading notes — local reference only, not tracked.
-# Project scaffolding (CLAUDE.md, AGENTS.md, CONTEXT.md, PROGRESS.md, reviews.md,
-# README.md, docs/adr/*.md) stays tracked — it's read by future sessions/collaborators.
-*.pdf
+# This repository tracks the implementation only. The paper source, the reading notes
+# extracted from it, the decision records and the session logs all stay on local disk --
+# they are working material, not part of the published reproduction.
+docs/
 paper.md
-docs/paper/*.md
+*.pdf
+AGENTS.md
+CLAUDE.md
+CONTEXT.md
+PROGRESS.md
+block1_progress.md
+reviews.md
+
+# Agent tooling and scratch space
+.claude/
+.agents/
+skills-lock.json
+.scratch/
 
 # OS / editor
 .DS_Store
 *.swp
-
-# Agent skills installed via `npx skills add` (168 skills, not project source)
-.agents/
-skills-lock.json
-
-# to-tickets working area
-.scratch/

@@ -1,7 +1,6 @@
 """Block 3 evaluation helpers: population rates, the r_bar-over-subsample estimate, and
 Fig. 3C-D's pair enumeration and CCG peak -- the analysis side of this block, used
-by full_pass.py, panels.py and vm_ccg.py (docs/paper/03-recurrent-spiking-network.md,
-07-analysis-methods.md).
+by run.py, figures_ab.py and figures_cd.py (SOM S-p.20-21 and S-p.24-28).
 """
 import itertools
 
@@ -13,7 +12,7 @@ from analysis import mean_of_defined_pairs, windowed_rate
 
 def population_rate_hz(spike_monitor, n_neurons: int, burn_in_ms: float, duration_ms: float) -> float:
     """Mean firing rate (spikes/s/neuron) after discarding the burn-in period (config.yaml:
-    spiking_network.burn_in_ms -- the paper doesn't state one, see docs/paper/03 Ambiguity).
+    spiking_network.burn_in_ms -- the paper states none; an ambiguity in SOM S-p.20-21).
     """
     t_ms = np.asarray(spike_monitor.t / b2.ms)
     n_spikes_after_burn_in = int(np.sum(t_ms >= burn_in_ms))
@@ -42,8 +41,8 @@ def spike_times_by_neuron(spike_monitor, n_neurons: int, burn_in_ms: float) -> l
 
 
 def sample_neuron_subset(n_total: int, n_sample: int, rng: np.random.Generator) -> np.ndarray:
-    """PROGRESS.md (researcher-confirmed): r_bar is estimated over a fixed-size random
-    subsample of E neurons, mirroring Fig. S6's own "1000 E and 1000 I cells" convention --
+    """Researcher-confirmed: r_bar is estimated over a fixed-size random subsample of E
+    neurons, mirroring Fig. S6's own "1000 E and 1000 I cells" convention --
     not all N_E pairs (too many: ~8M for N_E=4000) and not an ad hoc small sample.
     """
     return rng.choice(n_total, size=n_sample, replace=False)

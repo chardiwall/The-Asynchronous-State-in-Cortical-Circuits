@@ -1,13 +1,13 @@
-"""Recurrent conductance-based spiking network (Fig. 3), docs/paper/03-recurrent-spiking-network.md.
-Equations declared literally against SOM S-p.20-21 (ADR 0001): one neuron equation shared by
+"""Recurrent conductance-based spiking network (Fig. 3), SOM S2.1.2, S-p.20-21.
+Equations declared literally against SOM S-p.20-21: one neuron equation shared by
 the E and I NeuronGroups (only N and t_ref differ), one difference-of-exponentials synapse
 equation shared by all six ordered population pairs (only mean conductance, reversal potential
 and delay range differ). X is a pure b2.PoissonGroup -- no membrane equation, no recurrent
-input (docs/paper/03: "N_X=4000 independent Poisson trains").
+input (SOM S-p.20-21: "N_X=4000 independent Poisson trains").
 
 X's own conduction delay isn't given a formula in the paper (only "from excitatory cells" and
 "from inhibitory cells" ranges are stated); assumed to follow the excitatory-cell range since
-V_rev^X=V_rev^E classifies X as excitatory-type (docs/paper/03 Ambiguity).
+V_rev^X=V_rev^E classifies X as excitatory-type (an ambiguity in SOM S-p.20-21).
 
 EE and II synapses exclude self-connections (i==j), matching block 2's binary-network
 convention for within-population pairs -- a neuron does not synapse onto itself.
@@ -72,7 +72,7 @@ def _build_synapse(source, target, post_current_name, v_rev_mV, mean_g_nS, std_f
 
     # Connectivity generated in numpy before connect() is called, not via Brian2's own
     # connect(p=...) + reading len(synapse) back afterwards -- required for cpp_standalone
-    # (see PROGRESS.md Phase 2): standalone defers connect(p=...)'s resolution into generated
+    # -- standalone defers connect(p=...)'s resolution into generated
     # code, so Python can't learn the realised synapse count before that code has run.
     pre_index, post_index = generate_bernoulli_connectivity(len(source), len(target), p, rng, exclude_self)
     synapse.connect(i=pre_index, j=post_index)

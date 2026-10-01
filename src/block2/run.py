@@ -8,8 +8,10 @@
     python -m block2.run plot                  every figure from whatever CSVs exist
 
 The sweeps run one OS process per (N, realisation) task via a Slurm array rather than an
-in-process pool (docs/adr/0003), so `sweep` and `current` take a flat task index and write
-one row each; `aggregate` stitches them together afterwards.
+in-process pool (which copied real memory per worker -- OOM at N=8192 -- and whose
+ProcessPoolExecutor misbehaved on the cluster's ARM64 nodes), so `sweep` and `current`
+take a flat task index and write one row each; `aggregate` stitches them together
+afterwards.
 """
 import csv
 import datetime

@@ -6,11 +6,12 @@
 # Each task runs 50 s of simulated time (SOM S-p.21) on the full 9M-synapse network.
 # Measured reference from the Fig. 3A-B full pass on this node: 200 s cost 27h07m wall
 # and 3.85GB peak RSS, so 50 s extrapolates to ~7h. --time is set well above that because
-# this node's throughput is sensitive to concurrent load (see PROGRESS.md 2026-09-21), and
+# this node's throughput is sensitive to concurrent load, and
 # --mem is set from that measured 3.85GB plus the recorded-voltage monitor: 20 cells x
 # (50s / 1ms) samples x 8 bytes is only 8MB, so the network state still dominates.
 #
-# Container wrapper: spark-c3d8 has no python3.12-dev and no sudo (docs/adr/0005).
+# Container wrapper: spark-c3d8 has no python3.12-dev and no sudo, so Brian2 would
+# silently fall back to its pure-Python codegen target (~493h/network, infeasible).
 #   sbatch slurm/block3_vm_ccg.slurm
 #SBATCH --job-name=block3_vm_ccg
 #SBATCH --partition=gpu

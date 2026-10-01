@@ -1,6 +1,6 @@
-"""Seams: sample_neuron_subset, population_averaged_pairwise_correlation -- Phase 2's
-r_bar-over-subsample estimate (PROGRESS.md: 1000-E-neuron subsample, mirroring Fig. S6's
-own "1000 E and 1000 I cells" convention, all pairs among the subsample)."""
+"""Seams: sample_neuron_subset, population_averaged_pairwise_correlation -- the
+r_bar-over-subsample estimate (1000-E-neuron subsample, mirroring Fig. S6's own
+"1000 E and 1000 I cells" convention, all pairs among the subsample)."""
 import numpy as np
 
 from analysis import spike_count_correlation

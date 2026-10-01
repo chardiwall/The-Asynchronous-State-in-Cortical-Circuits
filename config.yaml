@@ -1,15 +1,14 @@
 # Single source of truth for every seed, path and model parameter.
-# No numeric constant may be hardcoded in Python — see CLAUDE.md "Reproducibility".
+# No numeric constant may be hardcoded in Python; every value is read from here.
 #
-# All model values below are transcribed from Renart et al. 2010 (see docs/paper/).
+# All model values below are transcribed from Renart et al. 2010, Science 327, 587
+# and its Supporting Online Material (cited below as SOM, S-p.<n>).
 # Provenance is given per block so any value can be traced back to the SOM.
 
 seed: 1234                     # sets random, numpy and framework RNGs at script startup
 
 paths:
-  raw: data/raw                # READ-ONLY. never written to.
-  processed: data/processed
-  artifacts: artifacts         # metrics, logs, figures, checkpoints
+  artifacts: artifacts         # the single output location: metrics, logs, figures
 
 logging:
   metrics_file: artifacts/metrics.jsonl
@@ -18,7 +17,7 @@ logging:
 
 # ---------------------------------------------------------------------------
 # Block 1 — feedforward postsynaptic pair (Fig. 1)
-# Provenance: SOM S-p.19-20. See docs/paper/01-postsynaptic-pair.md
+# Provenance: main text Fig. 1 + Eq. 1; SOM S2.1.2 "Figure 1 (main text)", S-p.19-20.
 # ---------------------------------------------------------------------------
 pair_model:
   neuron:                      # current-based LIF, V relative to rest (rest = 0)
@@ -47,20 +46,20 @@ pair_model:
       # check out independently, so the paper's two numbers are mutually inconsistent here.
       # Researcher's call: honour the stated OUTPUT rate and recalibrate the input, so both
       # Fig. 1E curves share an operating point ("identical statistics", per the caption).
-      # block1.full_pass raises rather than run while this is null.
+      # block1.run sweep raises rather than run while this is null.
       #
       # Re-derive this whenever n_excitatory, n_inhibitory, tau_m_ms, the PSP amplitudes or
       # the threshold change -- like the E-only rate below, it is a property of the whole
       # operating point, not a free parameter.
     rate_e_only_calibrated_hz: 4.04297   # Fig. 1E E-only curve -- resolves ambiguity 1
-      # (docs/paper/01-postsynaptic-pair.md): the paper's 20Hz is E+I-only; the E-only rate
+      # (SOM S-p.19-20): the paper's 20Hz is E+I-only; the E-only rate
       # isn't stated, so it's calibrated by bisection (block1.calibrate_rate) to give 5Hz
       # output at r_in=0, averaging n_trials=5 independent replicates per candidate rate
       # (a code-review fix: the original single-sample-per-step version could violate
       # bisection's monotonicity assumption under simulation noise). Re-derived 2026-09-10
       # at L=20,000ms (a longer one-time calibration run, not the fast-exploratory sweep
       # scale); superseded an earlier single-sample value of 4.0708 (0.7% higher, within
-      # noise but less reliably derived). PROGRESS.md records the derivation.
+      # noise but less reliably derived).
     mother_train:
       jitter_tau_ms: 5.0       # two-tailed exponential, zero mean
   sweeps:
@@ -75,7 +74,7 @@ pair_model:
       # curve rises steeply and the E-vs-E+I contrast is decided; 0.025 is kept because it
       # is the example point Figs. 1C and 1F are drawn at.
       #
-      # Cost: block1.full_pass batches every sweep point into ONE Brian2 NeuronGroup per
+      # Cost: block1.run sweep batches every sweep point into ONE Brian2 NeuronGroup per
       # time chunk, so this widens that group from 15 points to 21 (5 p-points + 8 r_in
       # points per condition, 2 conditions) -- about 1.4x the per-timestep width, not 1.4x
       # the run. Simulated duration (`simulation.length_s`) remains the dominant cost.
@@ -83,9 +82,9 @@ pair_model:
   simulation:
     dt_ms: 0.05
     length_s: 10000.0
-    chunk_duration_s: 200.0  # block1.full_pass: bounded per-chunk window for the paper-
+    chunk_duration_s: 200.0  # block1.run sweep: bounded per-chunk window for the paper-
       # accurate full pass (both input generation and simulation are chunked at this scale
-      # -- see PROGRESS.md). block1.batched_model batches all 15 sweep points into one
+      # at this scale). block1.batched_model batches all 15 sweep points into one
       # simulation, so per-chunk arrays are 15x wider than the original per-point design
       # this value was first set for.
       #
@@ -120,7 +119,7 @@ pair_model:
 
 # ---------------------------------------------------------------------------
 # Block 2 — recurrent binary network (Fig. 2)
-# Provenance: SOM S-p.18-19. See docs/paper/02-binary-network.md
+# Provenance: SOM S1 (theory, S-p.3-17) and S2.1.1 (numerics, S-p.18-19).
 # ---------------------------------------------------------------------------
 binary_network:
   connection_probability: 0.2  # p_ab, all population pairs
@@ -142,8 +141,10 @@ binary_network:
     # (N=1024: 612,850 ticks/s; N=8192: 83,433 ticks/s -- close to O(N^2) per-realisation
     # cost), targeting <24h wall-clock on spark-c3d8's 20 Slurm cores. Repeats taper at
     # the top of the range since cost is dominated there; paper's 50 kept everywhere it's
-    # cheap. Runs as independent single-process Slurm array tasks (block2.full_pass),
-    # not Python multiprocessing -- see docs/adr/0003's ARM64 ProcessPoolExecutor note.
+    # cheap. Runs as independent single-process Slurm array tasks (block2.run sweep),
+    # not Python multiprocessing: an in-process ProcessPoolExecutor pool copied real
+    # memory per worker (OOM at N=8192) and misbehaved on ARM64, so each task is its own
+    # OS process.
     sizes:   [100, 178, 316, 562, 1000, 1780, 3160, 5620, 8192]
     repeats: [50,  50,  50,  50,  50,   50,   25,   12,   10]
     length_tau: 200000
@@ -167,7 +168,7 @@ binary_network:
       # ("Description of the asynchronous self-consistent solution"), with no curves in it.
       # The SOM does say "Each dot (curve) in Fig. 2C (2F) is the average over 50 (10)
       # simulations", so the two sources disagree -- most likely a leftover from a draft
-      # where panel F was plotted. Documented in docs/paper/06-figure-protocols.md rather
+      # where panel F was plotted. Recorded here as a known conflict in the source rather
       # than silently resolved either way.
   robustness:                  # Fig. S4 sweep
     lambda_E: [1.0, 2.0]       # scales j_EE and j_IE together
@@ -182,7 +183,7 @@ binary_network:
 
 # ---------------------------------------------------------------------------
 # Block 3 — recurrent conductance-based spiking network (Fig. 3)  [MAIN FOCUS]
-# Provenance: SOM S-p.20-21. See docs/paper/03-recurrent-spiking-network.md
+# Provenance: main text Fig. 3; SOM S2.1.2 "Figure 3 (main text)", S-p.20-21.
 # ---------------------------------------------------------------------------
 spiking_network:
   populations:
@@ -208,7 +209,9 @@ spiking_network:
     g_II: 40.0
     g_EX: 5.4
     g_IX: 5.4
-    heterogeneity_std_fraction: 0.5   # g ~ Gaussian(mean, 0.5*mean); see ADR on negative samples
+    heterogeneity_std_fraction: 0.5   # g ~ Gaussian(mean, 0.5*mean); negative draws are
+      # resampled from a shifted Gaussian -- a negative g would flip a synapse's sign and
+      # break Dale's law, and naive discarding would bias the realised mean by +2.8%
   synapse:                     # difference of exponentials
     tau_rise_ms: 1.0
     tau_decay_ms: 5.0
@@ -220,7 +223,7 @@ spiking_network:
     kind: poisson
     rate_hz: 2.5
   burn_in_ms: 100.0             # discarded before recording -- paper doesn't state one
-    # (docs/paper/03 Ambiguity); ~7x tau_m=15ms, long enough for the initial transient
+    # (an ambiguity in SOM S-p.20-21); ~7x tau_m=15ms, long enough for the initial transient
     # to settle. Revisit with real numbers before the Fig. 3A-B full pass.
   simulation:
     integrator: rk2            # second-order Runge-Kutta
@@ -246,10 +249,10 @@ spiking_network:
       #
       # Raise this to 5000 and the guard below will refuse -- by design. See GitHub #8.
     max_rate_matrix_gb: 10.0    # NOT a paper value -- a guard, sized against panels.slurm's
-      # --mem. eval.pairwise_correlations stacks an (r_bar_sample_size, n_windows) float64
+      # --mem. block3.measure.pairwise_correlations stacks an (r_bar_sample_size, n_windows) float64
       # matrix, n*(length_s*1000 - burn_in_ms)/bin_dt_ms*8 bytes: 1.6GB at 200 s, 8GB at
-      # 1000 s, 40GB at 5000 s, and numpy.corrcoef adds a centred copy on top. panels.py
-      # checks this BEFORE building the network, because the failure would otherwise land
+      # 1000 s, 40GB at 5000 s, and numpy.corrcoef adds a centred copy on top.
+      # block3.figures_ab checks this BEFORE building the network, because the failure would land
       # after a multi-day run with nothing written.
   r_bar_sample_size: 1000       # session 2026-09-16/17 grilling: r_bar estimated over all
     # pairs among this many randomly-sampled E neurons, mirroring Fig. S6's own "1000 E and
@@ -261,7 +264,7 @@ spiking_network:
     # identical, so this run is a true subset of the eventual full pass.
     length_s: 5.0
     n_networks: 1
-    brian2_device: runtime      # standalone deferred until a measured need (ADR 0001/0003 pattern)
+    brian2_device: runtime      # standalone deferred until a measured need
   fig3a:                        # Fig. 3A caption (main text p.590)
     raster_neurons: 500         # "Raster (top) of 500 E (green) and I (red) neurons
       # sorted by rate". AMBIGUITY: the caption does not say whether this is 500 total
@@ -291,7 +294,8 @@ spiking_network:
       # networks = 450 ("an average over 450 cell pairs from ten different networks"),
       # and cross-condition (EPSP-IPSP) pairs = 10 x 10 = 100 per network x 10 networks
       # = 1000 ("except the EPSP-IPSP condition ... the number of pairs was 1000").
-      # No other simple scheme reproduces both numbers. Recorded as docs/adr/0006.
+      # No other simple scheme reproduces both numbers. The cells at each level are
+      # recorded simultaneously; the SOM never states the sampling scheme.
     epsp_condition_nA: -1.3     # most hyperpolarising level: pushes V toward V_rev^I so
       # the trace is EPSP-dominated (Fig. 3C green). INFERRED as the extreme of the swept
       # list -- the SOM states the intent ("adjusted to isolate the EPSPs and IPSPs in
@@ -315,7 +319,7 @@ spiking_network:
 
 # ---------------------------------------------------------------------------
 # Analysis pipeline — shared by all blocks
-# Provenance: SOM S-p.24-28. See docs/paper/07-analysis-methods.md
+# Provenance: SOM S2.3.4-2.3.6, S-p.24-28.
 # ---------------------------------------------------------------------------
 analysis:
   bin_dt_ms: 1.0

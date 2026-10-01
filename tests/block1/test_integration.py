@@ -1,6 +1,6 @@
 """End-to-end checks against the real config.yaml (not a fixture) -- this is the
-committed, reproducible source for the "ran end-to-end, NaN-checked" claims in
-PROGRESS.md. Also appends to artifacts/ so there's a log trail of real runs.
+committed, reproducible source for the "ran end-to-end, NaN-checked" claims. Also
+appends to artifacts/ so there's a log trail of real runs.
 """
 import datetime
 import json
@@ -15,7 +15,7 @@ from config import load_config
 
 
 def _zoh_bias_tol(dt_ms: float, tau_s_ms: float, safety_factor: float = 3.0) -> float:
-    """Tolerance for TimedArray's zero-order-hold bias (ADR 0002): O(dt/tau_s)."""
+    """Tolerance for TimedArray's zero-order-hold bias: O(dt/tau_s)."""
     return safety_factor * dt_ms / tau_s_ms
 
 
@@ -98,16 +98,16 @@ def test_phase2_model_handles_realistic_pooled_load_against_real_config():
 
 def test_phase3_pipeline_handles_hundreds_of_thousands_of_pooled_events():
     # Phase 3.6: sanity check at a scale the OLD per-event Brian2 mechanism could not
-    # have built at all (ADR 0002). Full real N_E/N_I/rate from config.yaml, at Fig.
+    # have built at all. Full real N_E/N_I/rate from config.yaml, at Fig.
     # 1F's exact (p, r_in) operating point, but a reduced duration (10s not 10,000s) so
     # this stays fast enough for the regular suite -- event *count* is what's being
     # stress-tested here, not wall-clock time at full duration (that's a separate,
-    # deliberately-not-automated benchmark; see PROGRESS.md for the real-scale timing
-    # this smoke test's scale was chosen from: 9.4M events / 1000s took 2.2s to
+    # deliberately-not-automated benchmark. The real-scale timing this smoke test's
+    # scale was chosen from: 9.4M events / 1000s took 2.2s to
     # generate and 258.8s to simulate in Brian2 -- input generation is no longer the
-    # bottleneck ADR 0002 fixed; Brian2's own per-timestep cost now dominates, which is
-    # the "trivially parallel over (p,r_in) grid points" cost docs/paper/
-    # 06-figure-protocols.md already anticipated, not a new blocker).
+    # bottleneck the precomputed-trace rework fixed; Brian2's own per-timestep cost now
+    # dominates, which is the "trivially parallel over (p,r_in) grid points" cost the
+    # paper's own figure protocol already anticipated, not a new blocker).
     config = load_config("config.yaml")
     neuron = config["pair_model"]["neuron"]
     synapse = config["pair_model"]["synapse"]

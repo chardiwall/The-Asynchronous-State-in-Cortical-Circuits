@@ -35,16 +35,15 @@ def simulate_pairs_batch_chunked(
 ):
     """Yields (start_ms, end_ms, BatchPairResult) once per time chunk, carrying V/
     lastspike/synaptic-trace-filter state forward between chunks -- the batched,
-    N-point analogue of the single-pair chunking this project's chunked.py used to do
-    (deleted once its only caller, train.py's per-point sweep, was superseded by
-    batching; see PROGRESS.md).
+    N-point analogue of the single-pair chunking this project used to do (deleted once
+    its only caller, the per-point sweep, was superseded by batching).
 
     input_provider(start_ms, end_ms) -> (e_spikes_a, i_spikes_a, e_spikes_b, i_spikes_b),
     each a length-n list of that chunk's pooled arrival times for point 0..n-1. Taking a
     callback rather than pre-built full-duration spike lists is what keeps memory bounded
     at production scale: block1.run regenerates each point's inputs per chunk
     (Poisson processes have independent increments, so this is statistically exact, not
-    an approximation -- the same reasoning the deleted train.py's _run_point_chunked
+    an approximation -- the same reasoning the deleted per-point chunked sweep
     established).
 
     This is a generator, not an accumulator: it does NOT concatenate results across

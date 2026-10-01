@@ -1,5 +1,5 @@
-"""Numba-JIT'd Glauber dynamics (docs/paper/02-binary-network.md) -- the production
-path for block 2's full pass. Same math as model.py/simulate.py, which stay the tested
+"""Numba-JIT'd Glauber dynamics (SOM S1, S-p.3-17) -- the production
+path for block 2's full pass. Same math as block2/model.py, which stays the tested
 pure-Python reference implementation used at exploratory scale and as this module's
 correctness oracle. Session 2026-09-11: the pure-Python loop measured ~29h/realisation
 at N=8192, length_tau=200,000 (~60 days for the paper's 50 realisations) -- too slow for
@@ -9,7 +9,7 @@ nopython mode can't take a dict of named (n,n) arrays, so state and weights are
 restructured: one concatenated (3n,) state vector (E,I,X in order) and two stacked
 (n,3n) weight matrices, weights_E=[EE|EI|EX], weights_I=[IE|II|IX] (built directly by
 connectivity.build_weights_stacked -- see its docstring for why the stacked layout is a
-memory fix, not an optimisation). Cross-checked against model.py/simulate.py
+memory fix, not an optimisation). Cross-checked against block2/model.py
 statistically, not bit-for-bit: Numba's RNG and numpy's Generator are different
 algorithms.
 
@@ -134,9 +134,9 @@ def simulate_fast_one(
     n: int, p: float, j: dict[str, float], m_x: float, theta: float,
     length_tau: int, sampling_rate: int, burn_in_tau: int, seed: int,
 ) -> np.ndarray:
-    """One realisation, returned as the raw (3n, n_samples) uint8 array. full_pass.py
+    """One realisation, returned as the raw (3n, n_samples) uint8 array. block2/run.py
     slices E/I/X views straight off it, so no second copy into a per-population dict is
-    ever made -- that copy was real, measured memory (OOM at N=8192, docs/adr/0003).
+    ever made -- that copy was real, measured memory (OOM at N=8192).
     """
     n_samples = length_tau * sampling_rate
     ticks_per_tau = 3 * n

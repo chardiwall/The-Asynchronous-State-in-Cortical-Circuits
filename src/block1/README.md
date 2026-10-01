@@ -6,8 +6,8 @@ partly-shared, partly-correlated Poisson input. This is the smallest scale at wh
 paper's central mechanism appears — weak input correlation is hugely amplified by summing
 over many inputs, and matched inhibition cancels that amplification.
 
-**Status: complete.** All four panels have been produced. See the root `PROGRESS.md` for
-the actual numbers from the last run.
+**Status: complete.** All four panels have been produced; `artifacts/` holds the metrics
+and figures written by the last run.
 
 ## Run it
 
@@ -83,8 +83,8 @@ specifies. That happens automatically on every run.
 
 At the paper's `length_s = 10000.0`, all 21 sweep points batch into one Brian2 `NeuronGroup`
 of 42 neurons (two cells per point) and run chunk by chunk. The dominant cost is Brian2's
-per-timestep work over the full 10,000 simulated seconds at `dt = 0.05 ms`. Consult `PROGRESS.md` for the last
-measured wall-clock time on this machine rather than trusting an estimate here.
+per-timestep work over the full 10,000 simulated seconds at `dt = 0.05 ms`. Measure it on
+your own hardware rather than trusting an estimate here.
 
 For a quick check that the pipeline works, set `length_s` to something like `100.0`. The
 curves will be visibly noisy but the E-only-versus-E+I contrast should already be obvious.
@@ -125,7 +125,7 @@ falling back to 20 spikes/s, which would leave the two curves at ~5 and ~12 spik
 
 ## Fixed 2026-09-30: the shared inputs were not mother-train children
 
-`dataset.py` drew the `p·N` literally-shared trains as **independent** Poisson processes, so
+`inputs.py` drew the `p·N` literally-shared trains as **independent** Poisson processes, so
 they carried none of the mother train's correlation. The supplement says "**Each**
 pre-synaptic train was a thinned version of the mother train". This biased the current
 correlation low by about 10% at `r_in = 0.01` and 5.5% at `r_in = 0.025`, the marked circle

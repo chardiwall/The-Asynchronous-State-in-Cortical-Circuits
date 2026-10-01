@@ -1,5 +1,6 @@
 """Seam: simulate_pair's optional carry-forward state (v_init_*_mV, zi_*) -- the piece
-ADR 0002 deferred, needed to run Fig. 1's real L=10,000s scale in bounded-memory chunks.
+the precomputed-trace rework deferred, needed to run Fig. 1's real L=10,000s scale in
+bounded-memory chunks.
 Chaining two chunked calls (2nd seeded from the 1st's returned final state) must equal
 one unchunked call over the combined duration -- same principle already validated for
 current_trace.synaptic_trace's zi/zf mechanism in Phase 3.

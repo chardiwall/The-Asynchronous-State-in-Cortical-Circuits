@@ -6,12 +6,12 @@ trace obeys the same linear ds_i/dt = -s_i/tau_s + delta(t-t_i), their sum obeys
 ODE driven by the pooled (merged) set of all E-population arrival times onto that cell -- so
 this model takes one pooled arrival-time array per cell per population, not per-input identity.
 
-s_E(t)/s_I(t) are precomputed via lib.psc.synaptic_trace (ADR 0002) and fed to
+s_E(t)/s_I(t) are precomputed via lib.psc.synaptic_trace and fed to
 Brian2 as TimedArrays, rather than built from per-event SpikeGeneratorGroup/Synapses objects
--- the latter doesn't scale to Fig. 1's real input volume (see ADR 0002). This is an internal
+-- the latter doesn't scale to Fig. 1's real input volume. This is an internal
 rework only; the public seam (pooled arrival arrays in, PairResult out) is unchanged.
 
-Trade-off discovered while doing this rework (recorded in ADR 0002): TimedArray holds
+Trade-off discovered while doing this rework: TimedArray holds
 s_E/s_I piecewise-constant between dt-grid samples, whereas the old mechanism let Brian2
 exactly integrate V and the continuously-decaying s_E/s_I together within each timestep.
 This introduces a small O(dt/tau_s) bias in V (~0.1% at dt=0.01ms, tau_s=5ms) that wasn't

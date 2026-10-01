@@ -9,7 +9,7 @@
 # value sized for N=8192 (~9GB) throttles concurrency to ~11-way for the ENTIRE
 # grid (most tasks need only megabytes) -- and a value too small for the
 # actual N being run causes real OOM kills, not just queuing (both observed on
-# the DGX in session 2026-09-12; see docs/adr/0003). Submit per tier, e.g.:
+# the DGX in session 2026-09-12). Submit per tier, e.g.:
 #   sbatch --array=0-299%20  --mem=1G slurm/block2_sweep.slurm   # N<=1780
 #   sbatch --array=300-324%20 --mem=3G slurm/block2_sweep.slurm  # N=3160
 #   sbatch --array=325-336%19 --mem=6G slurm/block2_sweep.slurm  # N=5620

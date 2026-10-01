@@ -10,7 +10,7 @@ pair model rather than against a separate hand-built reference.
 **Input rates**, by bisection, since a LIF neuron's output rate under Poisson bombardment
 has no closed form. Two conditions need it, for different reasons:
 
-- *E-only*: the paper never states this rate at all (ambiguity 1, docs/paper/01).
+- *E-only*: the paper never states this rate at all (ambiguity 1).
 - *E+I*: the paper states 20 spikes/s and says it "produce[s] an output rate of 5 spikes/s
   when r_in = 0" (S-p.19-20). Measured, 20 spikes/s gives ~10.5. The weight calibration, the
   analytic mean drive and the free-membrane statistics each check out independently, so the

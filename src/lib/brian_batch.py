@@ -6,13 +6,13 @@ each is its own feedforward pair with its own pooled inputs, no coupling between
 (model.py's docstring: "no recurrent connectivity... purely feedforward"). Stacking them
 into one NeuronGroup changes nothing about any individual point's dynamics; it only
 changes how many neurons share one Brian2 Network/Clock. This targets the documented
-bottleneck directly: PROGRESS.md's Phase 3.6 benchmark found input generation is fast
+bottleneck directly: a benchmark found input generation is fast
 (~2s for 9.4M events) but Brian2's own per-run cost dominates (~260s/1000s of dynamics)
 -- N separate b2.run() calls each pay that per-run overhead once; one batched call pays
 it once total, and (unlike the unbatched path) hands the GPU backend (brian2cuda) 2N-wide
 per-timestep work instead of 2-wide.
 
-Same equations, same TimedArray zero-order-hold (ADR 0002), same threshold/reset/
+Same equations, same TimedArray zero-order-hold, same threshold/reset/
 refractory as model.simulate_pair -- this module changes N, not the math. The
 carry-forward state model.py added for chunking (V, lastspike, synaptic-trace filter
 state) generalizes here from scalars/1-D arrays to length-N arrays/lists, one entry per

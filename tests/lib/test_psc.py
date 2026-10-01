@@ -1,4 +1,4 @@
-"""Seam: synaptic_trace -- the ADR 0002 IIR-filter replacement for per-event Brian2
+"""Seam: synaptic_trace -- the IIR-filter replacement for per-event Brian2
 delivery. s[n] = a*s[n-1] + k[n], a=exp(-dt/tau_s), k[n]=spike count in bin n. Exact
 given the same dt-grid assumption Brian2's own SpikeGeneratorGroup already makes.
 """

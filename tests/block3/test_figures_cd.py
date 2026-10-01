@@ -1,7 +1,7 @@
 """Seams for Fig. 3C-D (SOM S-p.21): disable_spiking -- the "spiking mechanism had been
 disabled" step, done by raising only the recorded cells' threshold out of reach;
 recorded_pairs -- the pair enumeration whose counts must reproduce the paper's stated 450
-and 1000 (docs/adr/0006); signed_peak -- Fig. 3D's "peak height of the membrane potential
+and 1000 (10 cells held per I_app level per network); signed_peak -- Fig. 3D's "peak height of the membrane potential
 CCG", which must stay NEGATIVE for the anticorrelated EPSP-IPSP condition.
 """
 import brian2 as b2
@@ -54,7 +54,7 @@ def test_a_disabled_cell_actually_stops_spiking_in_a_real_run():
 
 
 def test_pair_counts_reproduce_the_papers_450_and_1000():
-    # docs/adr/0006: 10 cells per condition per network, 10 networks.
+    # 10 cells per condition per network, 10 networks.
     within_a, within_b, cross = recorded_pairs(n_a=10, n_b=10)
 
     assert len(within_a) == 45 and len(within_b) == 45   # 45 * 10 networks = 450

@@ -1,5 +1,5 @@
 """Seam: run_one_task -- one independent Slurm array task per network realisation
-(PROGRESS.md Phase 2), mirroring block2's full_pass.py (one process per task, no
+mirroring block2's run.py (one process per task, no
 in-process pool). Small N / short duration for test speed."""
 import numpy as np
 

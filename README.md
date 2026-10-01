@@ -1,72 +1,99 @@
-# The Asynchronous State — reproduction and extension
+# The Asynchronous State in Cortical Circuits — reproduction
 
-Reproducing Renart et al. 2010, *The Asynchronous State in Cortical Circuits*
-(*Science* **327**, 587), then replacing its network and its input to test whether the
-asynchronous state survives.
+A standalone reproduction of the three main-text figures of
 
-## The four levels
+> A. Renart, J. de la Rocha, P. Bartho, L. Hollender, N. Parga, A. Reyes, K. D. Harris,
+> *The Asynchronous State in Cortical Circuits*, **Science 327**, 587 (2010),
+> and its Supporting Online Material.
 
-| Level | Network | Input | Question |
-|-------|---------|-------|----------|
-| **L1** | paper's (binary + conductance-based LIF) | paper's (Poisson) | Can we reproduce it, and do we understand it? |
-| **L2** | **spiking reservoir (LSM)** | paper's (Poisson) | Does the asynchronous state hold with a reservoir? |
-| **L3** | paper's | **N-MNIST, DVS-Gesture** | Does it hold under structured event-based input? |
-| **L4** | **spiking reservoir (LSM)** | **N-MNIST, DVS-Gesture** | Does it hold when both are replaced? |
+The paper's claim is that a recurrent network of excitatory and inhibitory neurons can fire
+at realistic rates while remaining almost uncorrelated, because correlated excitatory and
+inhibitory input currents cancel. This repository implements that argument as three
+simulations and measures the same quantities the paper measures.
 
-The measurement is the invariant across all four: population-averaged spiking correlation `r̄`,
-the width `σ_r` of its distribution, the current-component correlations
-`c_EE / c_II / c_EI / c`, and how they scale with network size `N`.
+## What is measured
 
-## Where things are
+One invariant runs through all three blocks:
 
-| Path | Contents |
-|------|----------|
-| [`paper.md`](paper.md) | index and reading map for the paper — **start here** |
-| `docs/paper/` | full implementation-level extraction of the paper, split by block |
-| `docs/adr/` | architecture decision records (one file per decision) |
-| `docs/*.pdf` | the source PDFs |
-| `config.yaml` | every seed, path and model parameter — nothing is hardcoded in code |
-| `src/analysis.py` | the shared measurement pipeline, used identically by every block |
-| `src/lib/` | machinery: JIT kernels, Brian2 batching, Slurm-array bookkeeping, plotting helpers |
-| `src/block1/` | Fig. 1 — feedforward postsynaptic pair ([README](src/block1/README.md)) |
-| `src/block2/` | Fig. 2 — recurrent binary network ([README](src/block2/README.md)) |
-| `src/block3/` | Fig. 3 — recurrent conductance-based spiking network ([README](src/block3/README.md)) |
-| `slurm/` | cluster job scripts, named by block and figure |
-| `tests/` | tests, written before the code they cover |
-| `data/raw/` | **read-only** source data |
-| `data/processed/` | generated data |
-| `artifacts/` | metrics, logs, figures |
-| [`PROGRESS.md`](PROGRESS.md) | current session's objectives and completion criteria |
-| [`CONTEXT.md`](CONTEXT.md) | glossary of project terms |
-| [`reviews.md`](reviews.md) | human-readable session log (written by `/finalise`) |
-| [`AGENTS.md`](AGENTS.md) | agent-facing session log (written by `/finalise`) |
+- `r̄` — the population-averaged pairwise spiking correlation,
+- `σ_r` — the width of its distribution,
+- `c_EE`, `c_II`, `c_EI`, `c` — the current-component correlations whose cancellation is
+  the mechanism,
+- and how each scales with network size `N`.
 
-Each block holds the paper's own equations and **one entry point**, `run.py`, with
-subcommands. Everything that is machinery rather than science lives in `src/lib`, and
-nothing in `src/lib` imports from a block.
+The same estimators are used everywhere (`src/analysis.py`), so a result in one block is
+comparable with a result in another.
+
+## The three blocks
+
+| Block | Figure | Model |
+|---|---|---|
+| [`src/block1/`](src/block1/README.md) | Fig. 1 B/C/E/F | Feedforward pair of current-based LIF neurons sharing a fraction of their inputs — separates the two sources of output correlation and shows E–I input correlation *decorrelates* |
+| [`src/block2/`](src/block2/README.md) | Fig. 2 B/C/D/E/G | Recurrent binary network under Glauber dynamics — the analytically tractable model, where the `r̄ ~ 1/N` scaling and the cancellation are *derived* rather than only observed |
+| [`src/block3/`](src/block3/README.md) | Fig. 3 A/B/C/D | Recurrent conductance-based spiking network at realistic sizes (`N_E = 4000`, `N_I = 1000`, `N_X = 4000`) — the main reproduction target; Fig. 3C–D is the paper's experimentally testable prediction |
+
+Each block holds the paper's own equations and exactly **one entry point**, `run.py`, with
+subcommands. Anything that is machinery rather than science lives in `src/lib`, and nothing
+in `src/lib` imports from a block.
+
+Fig. 2A and 2F are schematics in the paper, not simulations, so nothing is generated for
+them. Supplementary figures are out of scope.
 
 ## Status
 
-All three L1 blocks are implemented for the paper's **main-text** figures. Each block's own
-README is the run guide: exact commands per panel, which `config.yaml` keys trade cost against
-accuracy, the paper's target result, and that block's known deviations from the paper.
+All three blocks are implemented and under test. Results are a separate matter: the large
+passes are multi-day cluster jobs, and `artifacts/` is not tracked, so **a fresh clone ships
+the code, not the figures.**
 
-| Block | Figure | Code | Results |
-|---|---|---|---|
-| 1 | Fig. 1 B/C/E/F | complete | produced |
-| 2 | Fig. 2 B/C/D/E/G | complete | Fig. 2C's two sweeps are long cluster jobs; see `PROGRESS.md` |
-| 3 | Fig. 3 A/B/C/D | complete | Fig. 3A–B partially produced; Fig. 3C–D not yet run |
+| Block | Implementation | Results produced here |
+|---|---|---|
+| 1 | complete | Fig. 1 B/C/E/F, at the paper's full `length_s = 10000` |
+| 2 | complete | Panels 2B/2D/2E/2G. Fig. 2C's two `N`-sweeps are long Slurm-array jobs, not yet run to completion |
+| 3 | complete | Exploratory pass only; the Fig. 3A–B and 3C–D full passes have not been run |
 
-Fig. 2A and 2F are schematics in the paper, not simulations, so nothing is generated for them.
-Supplementary Figs. S2–S8 are **out of scope** so far.
+Each block's own README is the run guide: exact commands per panel, which `config.yaml` keys
+trade cost against accuracy, the paper's target result, and that block's known deviations
+from the paper. Read those before trusting any number.
 
-`PROGRESS.md` is authoritative for what has actually been run, at what scale, with what
-numbers. Two values in Fig. 3C–D's configuration are inferences rather than transcriptions and
-are flagged at the top of [`src/block3/README.md`](src/block3/README.md).
+Two values in Fig. 3C–D's configuration are inferences rather than transcriptions, and are
+flagged at the top of [`src/block3/README.md`](src/block3/README.md).
 
-## Working agreement
+## Layout
 
-See [`CLAUDE.md`](CLAUDE.md). In short: objectives and completion criteria are agreed before
-work starts; questions are asked one at a time; mathematics is taken from a library where one
-exists and reviewed line by line where it doesn't; tests come before implementation; files stay
-under 200 lines; and nothing is called "done" until it has run and written metrics to a log.
+| Path | Contents |
+|------|----------|
+| `config.yaml` | Every seed and model parameter, with per-block provenance back to the paper's SOM. Nothing numeric is hardcoded in Python |
+| `src/analysis.py` | The shared measurement pipeline, used identically by every block |
+| `src/config.py` | The single `config.yaml` loader |
+| `src/lib/` | Machinery: Numba kernels, Brian2 batching, chunking, Slurm-array bookkeeping, plotting helpers |
+| `src/block1/`, `src/block2/`, `src/block3/` | One directory per figure, each with its own README |
+| `slurm/` | Cluster job scripts, named by block and figure |
+| `tests/` | Tests, written before the code they cover |
+| `artifacts/` | Metrics, logs and figures (generated; not tracked) |
+
+## Running it
+
+```bash
+pip install -r requirements.txt
+pytest                                  # 164 tests
+python -m block1.run sweep              # see each block's README for the rest
+```
+
+`pytest.ini` sets `pythonpath = src`, so the modules import as `analysis`, `config`,
+`block1`, `lib`, and so on. There is no packaging step — this is a reference
+implementation to read, run and cite against the paper, not a library to install.
+
+## Conventions
+
+Worth knowing before changing anything:
+
+- **Every numeric constant comes from `config.yaml`**, with a comment tracing it to the
+  paper or marking it explicitly as an inference or a guard. If a value is not in
+  `config.yaml`, it does not belong in the code.
+- **Seeds are explicit.** `random`, `numpy` and the framework RNG are all set at startup
+  from `config.yaml`'s `seed`.
+- **Tests come first**, and they pin behaviour at named seams rather than restating the
+  implementation.
+- **Inferences are labelled as inferences.** Where the paper is silent or ambiguous, the
+  code and `config.yaml` say so at the point of use instead of quietly choosing.
+- **`artifacts/` is the single output location.** Nothing else is written to.

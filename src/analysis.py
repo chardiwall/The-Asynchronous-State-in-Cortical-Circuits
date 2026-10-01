@@ -97,9 +97,9 @@ def exact_current_correlation(p: float, r_in: float, n: int) -> float:
     """Main text ref. 15 (exact): for two sums of N variables each pairwise-correlated
     by r_in, of which N*p are literally common:
         c = [p + r_in*(N-p)] / [1 + r_in*(N-1)]
-    Assumes a "static"/long-run notion of pairwise correlation -- see PROGRESS.md
-    Phase 8 for why this differs from a short-timescale (e.g. PSC-filtered) measured c
-    under the mother-train method's temporal jitter.
+    Assumes a "static"/long-run notion of pairwise correlation, which is why it differs
+    from a short-timescale (e.g. PSC-filtered) measured c under the mother-train method's
+    temporal jitter.
     """
     return (p + r_in * (n - p)) / (1 + r_in * (n - 1))
 

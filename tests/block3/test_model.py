@@ -1,5 +1,5 @@
 """Seam: build_network -- wires the E/I/X populations and six synapse types together per
-docs/paper/03-recurrent-spiking-network.md. Small N throughout (test speed); behavior only,
+SOM S2.1.2, S-p.20-21. Small N throughout (test speed); behavior only,
 not Brian2's own equation-integration correctness.
 """
 import brian2 as b2
@@ -43,8 +43,8 @@ def test_synapse_counts_land_near_p_times_pre_times_post_and_conductances_are_no
 
 def test_running_produces_no_nan_and_every_population_spikes_under_strong_drive():
     # Test-only: boosted external rate, not the paper's 2.5 Hz -- at this small N the
-    # network isn't in the paper's target operating point anyway (see PROGRESS.md: N can't
-    # be shrunk without breaking it), so this only checks that the wiring *can* deliver
+    # network isn't in the paper's target operating point anyway (N can't be shrunk
+    # without breaking it), so this only checks that the wiring *can* deliver
     # enough drive to spike, not that rates are realistic.
     params = {**SMALL_PARAMS, "external_input": {"kind": "poisson", "rate_hz": 200.0}}
     net = build_network(params, rng=np.random.default_rng(5))

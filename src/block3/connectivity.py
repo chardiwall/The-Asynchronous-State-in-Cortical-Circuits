@@ -1,5 +1,5 @@
-"""Per-synapse connectivity parameters for block 3 (docs/paper/03-recurrent-spiking-network.md):
-conductance heterogeneity (ADR 0004) and conduction delays.
+"""Per-synapse connectivity parameters for block 3 (SOM S2.1.2, S-p.20-21):
+conductance heterogeneity and conduction delays.
 """
 import numpy as np
 from scipy.optimize import brentq
@@ -34,10 +34,10 @@ def resample_gaussian_conductances(
     `std_fraction * mean` -- the moments the SOM states ("Gaussian distributions of mean
     g^ab and std. dev. 0.5 g^ab").
 
-    ADR 0004 chose to redraw negative samples rather than clip, abs, or keep them, because
+    We redraw negative samples rather than clipping, abs-ing, or keeping them, because
     at this spread 2.3% of draws are negative and a negative conductance on an excitatory
-    synapse is an inhibitory synapse -- it would break Dale's law. What that ADR did not
-    record (found 2026-09-30, fixed 2026-10-01) is that conditioning on a positive draw
+    synapse is an inhibitory synapse -- it would break Dale's law. What that choice first
+    missed (found 2026-09-30, fixed 2026-10-01) is that conditioning on a positive draw
     SHIFTS the distribution: drawing from N(g, 0.5g) and discarding negatives gives a
     realised mean of 1.0276*g and a spread of 0.4708*g, not the stated g and 0.5g. Every
     conductance in the network was therefore ~2.8% too strong.
@@ -61,8 +61,7 @@ def sample_delays_ms(
     n: int, low_ms: float, high_ms: float, resolution_ms: float, rng: np.random.Generator
 ) -> np.ndarray:
     """Per-synapse conduction delay, d ~ U[low_ms, high_ms], quantised to the simulation's
-    dt=0.05ms grid (docs/paper/03-recurrent-spiking-network.md: "delays are an integer
-    number of time steps").
+    dt=0.05ms grid (SOM S-p.20-21: "delays are an integer number of time steps").
     """
     n_steps_low = round(low_ms / resolution_ms)
     n_steps_high = round(high_ms / resolution_ms)
@@ -73,8 +72,8 @@ def sample_delays_ms(
 def generate_bernoulli_connectivity(
     n_pre: int, n_post: int, p: float, rng: np.random.Generator, exclude_self: bool
 ) -> tuple[np.ndarray, np.ndarray]:
-    """docs/paper/03-recurrent-spiking-network.md: p_ij^ab ~ Bernoulli(p) independently per
-    candidate synapse. Generated in plain numpy, before any Brian2 object exists, and returned
+    """SOM S-p.20-21: p_ij^ab ~ Bernoulli(p) independently per candidate synapse.
+    Generated in plain numpy, before any Brian2 object exists, and returned
     as explicit (pre_index, post_index) arrays -- required for cpp_standalone compatibility:
     Brian2's own `Synapses.connect(p=...)` defers connectivity resolution into generated code,
     so Python can't read back how many synapses it created before that code has run (only

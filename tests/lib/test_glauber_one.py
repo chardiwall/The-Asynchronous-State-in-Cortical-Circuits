@@ -1,6 +1,6 @@
 """Seam: simulate_fast_one -- a single realisation's raw (3n, n_samples) result,
-the shape full_pass.py consumes directly, with no intermediate per-realisation copy
-(the memory fix in docs/adr/0003).
+the shape block2/run.py consumes directly, with no intermediate per-realisation copy
+(the memory fix: no second copy into a per-population dict).
 """
 import numpy as np
 

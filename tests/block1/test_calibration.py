@@ -13,7 +13,7 @@ from block1.calibration import calibrate_synaptic_weights, psp_weight, simulate_
 
 
 def _zoh_bias_tol(dt_ms: float, tau_s_ms: float, safety_factor: float = 3.0) -> float:
-    """Tolerance for TimedArray's zero-order-hold bias (ADR 0002): O(dt/tau_s). Derived
+    """Tolerance for TimedArray's zero-order-hold bias: O(dt/tau_s). Derived
     from the formula rather than a hand-picked constant, so it scales correctly if dt/tau
     change -- observed bias was ~0.1% at dt=0.01ms/tau_s=5ms (dt/tau_s=0.2%); safety_factor
     of 3x comfortably covers that without being loose enough to miss a real regression.

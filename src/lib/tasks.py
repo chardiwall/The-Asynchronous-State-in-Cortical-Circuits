@@ -1,8 +1,8 @@
 """Slurm-array bookkeeping: how a sweep is cut into independent tasks and stitched back
 together afterwards.
 
-Every sweep in this project runs as one OS process per task (docs/adr/0003 -- an in-process
-pool proved unreliable on the cluster's ARM64 nodes), so each writes its own row and a later
+Every sweep in this project runs as one OS process per task (an in-process pool proved
+unreliable on the cluster's ARM64 nodes), so each writes its own row and a later
 pass combines them. That shape was duplicated across block 2's two sweeps and block 3's two,
 with the same glob-load-sort-write in each; it lives here once instead.
 

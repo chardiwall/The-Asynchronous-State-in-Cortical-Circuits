@@ -1,4 +1,4 @@
-"""Single loader for config.yaml -- the only source of numeric constants (CLAUDE.md)."""
+"""Single loader for config.yaml -- the only source of numeric constants."""
 import yaml
 
 

@@ -1,10 +1,9 @@
 """Input generation for Block 1 (Fig. 1): the mother-train correlated-Poisson method
-(SOM S-p.20) and the p+r_in combination confirmed with the researcher (2026-09-10, see
-PROGRESS.md): p*N inputs are literally shared verbatim between the two cells; the
+(SOM S-p.20) and the p+r_in combination confirmed with the researcher (2026-09-10):
+p*N inputs are literally shared verbatim between the two cells; the
 remaining (1-p)N are drawn from a SINGLE shared mother-train pool across both cells (and,
 for the E+I condition, across both populations) -- not per-index-pair independent
-mothers, which would fail to reproduce M-Eq(1)'s N*r_in amplification (derivation in
-PROGRESS.md).
+mothers, which would fail to reproduce M-Eq(1)'s N*r_in amplification.
 """
 from dataclasses import dataclass
 
@@ -85,7 +84,7 @@ def build_pair_inputs(
     are children of ONE mother train spanning both populations and both cells, so every
     pair among a cell's inputs is correlated at r_in, which is what reproduces M-Eq(1)'s
     N*r_in amplification (a single pool, not per-index-pair independent mothers;
-    researcher-confirmed 2026-09-10, see PROGRESS.md for the derivation).
+    researcher-confirmed 2026-09-10).
     """
     if not (0.0 <= p <= 1.0):
         raise ValueError(f"p must be in [0, 1] (it's a shared fraction), got {p}")

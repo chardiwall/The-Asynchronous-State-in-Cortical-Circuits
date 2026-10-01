@@ -47,7 +47,7 @@ def tick(
     """S-p.18 exact algorithm's single elementary step: pick one of the 3N neurons
     uniformly, apply its population's update rule, mutate `state` in place. X cells
     redraw independently from Bernoulli(m_x) regardless of their previous state
-    (S-Eq 6's reduction, docs/paper/02-binary-network.md); E/I cells are set to
+    (S-Eq 6's reduction, SOM S1, S-p.3-17); E/I cells are set to
     Theta(h_i) via afferent_current (S-Eq 5-7).
     """
     n = len(state["E"])

@@ -64,7 +64,7 @@ def plot_sweep(series, x_key: str, x_label: str, title: str, out_path: str) -> N
 
 def _raster_trains(rate_hz, r_in, duration_ms, jitter_tau_ms, rng, n_display=N_DISPLAY_TRAINS):
     """A legible subsample of individual input trains correlated at r_in. The real
-    ~250-470 trains are pooled into one arrival stream internally (block1/dataset.py) and
+    ~250-470 trains are pooled into one arrival stream internally (block1/inputs.py) and
     would render as a solid block; a per-synapse raster figure subsamples for display too.
     Drawn at the same rate_hz/r_in as the trains actually driving the cell, so the
     displayed correlation structure matches, but these are not literally those trains.

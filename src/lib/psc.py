@@ -1,4 +1,4 @@
-"""ADR 0002: precomputed synaptic current traces, replacing per-event Brian2 delivery.
+"""Precomputed synaptic current traces, replacing per-event Brian2 delivery.
 
 ds/dt = -s/tau_s + sum_i delta(t-t_i). Over one timestep dt, the homogeneous part decays
 exactly by a = exp(-dt/tau_s); spikes landing in that bin add their unit kicks. Binning

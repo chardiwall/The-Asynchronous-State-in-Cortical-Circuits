@@ -1,4 +1,4 @@
-"""Seam: calibrate_input_rate -- ambiguity 1 in docs/paper/01-postsynaptic-pair.md:
+"""Seam: calibrate_input_rate -- ambiguity 1 in the paper (SOM S-p.19-20):
 the paper states 20Hz for the E+I condition but not the E-only rate; it must be found
 numerically so E-only output rate = 5Hz at r_in=0 (no closed form for LIF-under-Poisson
 firing rate). Bisection assumes output rate increases monotonically with input rate --

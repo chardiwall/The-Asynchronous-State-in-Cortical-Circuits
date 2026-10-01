@@ -97,7 +97,7 @@ def plot_fig2c(
             raise ValueError(
                 f"{name} is non-finite at sizes {list(sizes[~np.isfinite(series)])}. A log "
                 f"axis would drop those points silently. Most likely a neuron never changed "
-                f"state, making np.corrcoef return NaN for its whole row (block2/eval.py)."
+                f"state, making np.corrcoef return NaN for its whole row (block2/measure.py)."
             )
 
     fig, ax = plt.subplots(figsize=(6, 5))

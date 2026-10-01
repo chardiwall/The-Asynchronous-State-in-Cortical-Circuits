@@ -3,7 +3,7 @@
 Math: one mother Poisson train at rate/r_in; each child independently keeps each mother
 spike w.p. r_in (thin), then jitters every kept spike by Laplace(0, jitter_tau_ms). Every
 pair among the pooled children is correlated at r_in (not just matched index pairs) --
-this is required to reproduce M-Eq(1)'s N*r_in amplification (see PROGRESS.md derivation).
+this is required to reproduce M-Eq(1)'s N*r_in amplification.
 """
 import numpy as np
 import pytest

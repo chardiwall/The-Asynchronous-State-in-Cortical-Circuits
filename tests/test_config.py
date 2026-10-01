@@ -1,4 +1,4 @@
-"""Shared config loader used by every block (CLAUDE.md: no hardcoded constants)."""
+"""Shared config loader used by every block: no hardcoded constants."""
 import pytest
 
 from config import load_config

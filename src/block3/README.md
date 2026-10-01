@@ -6,10 +6,10 @@ binary network, with the same architecture but realistic population sizes
 Fig. 3C–D is the paper's **experimentally testable prediction** and the reason the block
 matters: it shows the cancellation directly in the membrane potential.
 
-Equations are declared literally against SOM S-p.20–21 (ADR 0001) as a Brian2 model. The
-structural picture — the wiring schematic, the per-neuron and per-synapse equations, the
-comparison against an L2 spiking reservoir, and the phase roadmap — is in
-[`docs/block3-architecture.md`](../../docs/block3-architecture.md). This file is the run guide.
+Equations are declared literally against SOM S-p.20–21 as a Brian2 model: one neuron
+equation shared by the E and I groups, one difference-of-exponentials synapse equation
+shared by all six ordered population pairs, and `X` as a plain Poisson group. This file is
+the run guide.
 
 ## ⚠ Things to check before trusting Fig. 3
 
@@ -26,7 +26,7 @@ These are recorded here because they are inferences, not transcriptions.
    only two numbers: 450 pairs for each same-condition curve and 1000 for the EPSP–IPSP
    curve. Holding 10 cells at each level per network reproduces both exactly —
    `C(10,2) = 45` same-condition pairs × 10 networks = 450, and `10 × 10 = 100` cross pairs
-   × 10 networks = 1000. No other simple scheme gives both. See `docs/adr/0006`. If you
+   × 10 networks = 1000. No other simple scheme gives both. If you
    reject it, only `fig3cd.n_recorded_cells_per_condition` and the pair enumeration change.
 
 3. **Fig. 3B runs at 1000 s, not the 5000 s the supplement states.** A deliberate,
@@ -150,25 +150,23 @@ Changing them means you are no longer reproducing Fig. 3.
 is 1 because the grey histogram is one surrogate of the same pairs, not the 500-surrogate
 significance test of S-Eq(41), which is a different procedure for *in vivo* data.
 
-## Before the Fig. 3A–B full pass: one unmeasured cost
-
-`eval.pairwise_correlations` builds a `(1000, ~49,950)` float64 rate matrix (about 400 MB)
-and hands it to `numpy.corrcoef`, which internally allocates a centred copy plus the Gram
-matrix. Peak RSS for that step has **not** been measured at full scale — the 3.85 GB figure
-below is from a run that predates it. Measure it once before sizing `--mem`, rather than
-repeating this project's history of OOM kills from unvalidated estimates.
-
 ## Compute reality
 
 Brian2's runtime mode needs its Cython headers, which this cluster lacks and there is no
 `sudo`. Both Slurm scripts therefore run inside a pyxis/enroot container that installs
-`python3.12-dev` per task (ADR 0005). Without it Brian2 silently falls back to pure-Python
-codegen, which measured **29× slower** and makes the full pass infeasible.
+`python3.12-dev` per task. Without it Brian2 silently falls back to pure-Python codegen,
+which measured **29× slower** and makes the full pass infeasible.
 
 Measured reference on this node: 200 s of simulated time cost **27h07m** wall and **3.85GB**
 peak RSS. A 200 ms benchmark had extrapolated 67 h, overestimating by about 2.5×, because
 per-timestep fixed overhead amortises far better over a long run. Size new jobs from the
 27-hour figure, and confirm with the `/usr/bin/time -v` log each task writes.
+
+One cost in that figure is **unmeasured**: `measure.pairwise_correlations` builds a
+`(1000, ~49,950)` float64 rate matrix (~400 MB) and hands it to `numpy.corrcoef`, which
+allocates a centred copy plus the Gram matrix. The 3.85 GB run predates that step, so
+measure peak RSS once before sizing `--mem` rather than repeating this project's history of
+OOM kills from unvalidated estimates.
 
 `cpp_standalone` was benchmarked and gave **no speedup** (possibly a regression, not root
 caused). Do not reach for it without re-measuring.
@@ -212,8 +210,7 @@ Machinery lives in `src/lib` (`tasks`, `plotting`); cluster scripts live in `slu
    out of 4000 the perturbation is small but not zero. Each task runs one condition pair
    rather than all levels at once, to keep it that way.
 
-## Out of scope so far
+## Out of scope
 
 Supplementary Figs. S6, S7 and S8 (detailed characterisation, robustness sweeps, sinusoidal
-drive). Their roadmap is in [`docs/block3-architecture.md`](../../docs/block3-architecture.md);
-none of them needs a change to `model.py`, only a different protocol and analysis.
+drive). None of them needs a change to `model.py` — only a different protocol and analysis.

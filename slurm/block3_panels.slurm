@@ -12,7 +12,7 @@
 # histogram is real but weaker than the published panel's. config.yaml has the numbers.
 #
 # --mem=24G: the rate matrix is 8GB at this length and numpy.corrcoef adds a centred copy,
-# on top of the ~4GB network state measured for the 200 s run. panels.py refuses to start
+# on top of the ~4GB network state measured for the 200 s run. block3.figures_ab refuses to start
 # if the matrix would exceed panels.max_rate_matrix_gb, so a misconfiguration fails in
 # seconds rather than after five days.
 #   sbatch slurm/block3_panels.slurm
