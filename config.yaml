@@ -83,12 +83,19 @@ pair_model:
   simulation:
     dt_ms: 0.05
     length_s: 10000.0
-    chunk_duration_s: 500.0  # block1.full_pass: bounded per-chunk window for the paper-
+    chunk_duration_s: 200.0  # block1.full_pass: bounded per-chunk window for the paper-
       # accurate full pass (both input generation and simulation are chunked at this scale
       # -- see PROGRESS.md). block1.batched_model batches all 15 sweep points into one
       # simulation, so per-chunk arrays are 15x wider than the original per-point design
-      # this value was first set for; kept smaller here (500s not 2000s) to keep peak RSS
-      # well under the DGX's 121GB even with that wider batching.
+      # this value was first set for.
+      #
+      # MEMORY/RUNTIME TRADE ONLY -- chunking is mathematically exact (the correlations are
+      # accumulated by analysis.StreamingCorrelation), so this never affects a result. Size
+      # it to the machine: per-chunk arrays are roughly
+      # chunk_s * 1000/dt_ms * n_points * 3 * 8 bytes, i.e. ~6.7GB at 500s and 21 points,
+      # which fits the DGX's 121GB but not a 30GB workstation. Lowered to 200s (~2.7GB) on
+      # 2026-10-01 when the grid widened from 15 points to 21 and the run moved local.
+      # Raise it again on the DGX if the per-chunk overhead starts to matter.
   calibration_rate:             # bisection settings for block1.calibrate_rate. NOT paper
     # values -- search parameters for resolving the two input-rate ambiguities. Sized from
     # a measurement, not guessed: an output-rate estimate is a noisy Monte Carlo quantity,

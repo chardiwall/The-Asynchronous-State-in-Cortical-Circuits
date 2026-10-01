@@ -1,6 +1,7 @@
-"""Seam: resample_gaussian_conductances -- ADR 0004's rejection sampling for block 3's
-per-synapse peak conductances (docs/paper/03-recurrent-spiking-network.md)."""
+"""Seam: resample_gaussian_conductances -- block 3's per-synapse peak conductances
+(docs/paper/03-recurrent-spiking-network.md, ADR 0004)."""
 import numpy as np
+import pytest
 from scipy.stats import truncnorm
 
 from block3.connectivity import (
@@ -18,21 +19,42 @@ def test_no_negative_conductances():
     assert np.all(g >= 0.0)
 
 
-def test_matches_zero_truncated_gaussian_moments():
+def test_realised_moments_match_the_papers_stated_ones():
+    """The SOM specifies "Gaussian distributions of mean g and std. dev. 0.5g". Truncating a
+    N(g, 0.5g) at zero shifts both moments -- the mean up by 2.76% and the spread down by
+    5.9% -- so drawing from that distribution and discarding negatives does NOT give what
+    the paper states. The draw is re-parameterised so the REALISED moments are the stated
+    ones, which is the only way to have both Dale's law and the paper's numbers.
+    """
     mean, std_fraction, n = 2.4, 0.5, 500_000
-    std = std_fraction * mean
 
     g = resample_gaussian_conductances(mean, std_fraction, n, np.random.default_rng(2))
 
-    # Independent source of truth: rejection-sampling a Gaussian conditioned on positivity
-    # is mathematically the zero-truncated Gaussian (scipy.stats.truncnorm), not the
-    # un-truncated Gaussian(mean, std) the resampling starts from.
-    a = (0.0 - mean) / std
-    expected = truncnorm(a, np.inf, loc=mean, scale=std)
+    standard_error = (std_fraction * mean) / np.sqrt(n)
+    assert abs(g.mean() - mean) < 5 * standard_error
+    assert abs(g.std() - std_fraction * mean) < 0.02 * std_fraction * mean
 
-    standard_error_of_mean = expected.std() / np.sqrt(n)
-    assert abs(g.mean() - expected.mean()) < 5 * standard_error_of_mean
-    assert abs(g.std() - expected.std()) < 0.02 * expected.std()
+
+def test_the_correction_is_solved_not_hardcoded_for_one_spread():
+    """The shift depends on the spread, so a constant tuned for 0.5 would be wrong for any
+    other value. config.yaml exposes heterogeneity_std_fraction, so this must hold generally.
+    """
+    for std_fraction in (0.3, 0.5, 0.7):
+        g = resample_gaussian_conductances(5.4, std_fraction, 400_000, np.random.default_rng(7))
+
+        assert abs(g.mean() - 5.4) < 0.01 * 5.4, std_fraction
+        assert abs(g.std() - std_fraction * 5.4) < 0.03 * std_fraction * 5.4, std_fraction
+
+
+def test_a_naive_truncated_gaussian_would_fail_the_above():
+    """Guards the guard: confirms the corrected moments differ measurably from what the
+    uncorrected rejection sampling produced, so the tests above could actually fail.
+    """
+    mean, std = 2.4, 0.5 * 2.4
+    naive = truncnorm((0.0 - mean) / std, np.inf, loc=mean, scale=std)
+
+    assert naive.mean() / mean == pytest.approx(1.0276, abs=1e-3)
+    assert naive.std() / mean == pytest.approx(0.4708, abs=1e-3)
 
 
 def test_delays_are_within_range_and_on_the_005ms_grid():
