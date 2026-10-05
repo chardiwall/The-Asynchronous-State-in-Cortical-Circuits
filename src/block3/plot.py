@@ -168,8 +168,10 @@ def plot_fig3d(csv_path: str, out_path: str) -> None:
     plt.close(fig)
 
 
-if __name__ == "__main__":
-    config = load_config("config.yaml")
+def main(config: dict) -> None:
+    """Every Fig. 3 panel, with each path resolved from config. Called both by this
+    module's __main__ and by `block3.run plot`, so the two cannot drift apart.
+    """
     panels_dir = output_path(config, "block3_panels_dir")
     os.makedirs(panels_dir, exist_ok=True)
     plot_fig3a(output_path(config, "block3_fig3a_raster_csv"),
@@ -180,3 +182,7 @@ if __name__ == "__main__":
     plot_fig3c(output_path(config, "block3_vm_ccg_csv"), output_path(config, "block3_fig3c"))
     plot_fig3d(output_path(config, "block3_vm_ccg_csv"), output_path(config, "block3_fig3d"))
     print(f"wrote fig3a/b/c/d.png to {panels_dir}/")
+
+
+if __name__ == "__main__":
+    main(load_config("config.yaml"))

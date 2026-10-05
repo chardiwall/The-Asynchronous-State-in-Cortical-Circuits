@@ -182,11 +182,9 @@ def main():
         print(f"panel {panel} data written")
 
     elif command == "plot":
-        from block2 import plot, plot_sweep
+        from block2 import plot
 
-        plot_sweep.plot_fig2c()
-        plot.plot_fig2b(); plot.plot_fig2d(); plot.plot_fig2e(); plot.plot_fig2g()
-        print("wrote fig2b/c/d/e/g.png")
+        plot.main(load_config("config.yaml"))
 
     else:
         raise SystemExit(f"unknown command {command!r}")

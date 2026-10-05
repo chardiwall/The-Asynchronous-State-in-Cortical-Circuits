@@ -97,8 +97,7 @@ def main():
     elif command == "plot":
         from block3 import plot
 
-        plot.plot_fig3a(); plot.plot_fig3b(); plot.plot_fig3c(); plot.plot_fig3d()
-        print("wrote fig3a/b/c/d.png")
+        plot.main(config)
 
     else:
         raise SystemExit(f"unknown command {command!r}")

@@ -15,7 +15,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from config import load_config
+from config import load_config, output_path
 from lib.plotting import BLACK, BLUE, GREEN, ORANGE, RED, read_csv
 
 EI_LAG_ZOOM_MS = 5.0   # half-width of 2D's and 2E's EI-Lag insets
@@ -138,11 +138,12 @@ def plot_fig2g(csv_path: str, out_path: str) -> None:
     plt.close(fig)
 
 
-if __name__ == "__main__":
+def main(config: dict) -> None:
+    """Every Fig. 2 panel, with each path resolved from config. Called both by this
+    module's __main__ and by `block2.run plot`, so the two cannot drift apart.
+    """
     from block2.plot_sweep import plot_fig2c
-    from config import load_config, output_path
 
-    config = load_config("config.yaml")
     panels_dir = output_path(config, "block2_panels_dir")
     plot_fig2b(f"{panels_dir}/panel_b.csv", output_path(config, "block2_fig2b"))
     plot_fig2d(f"{panels_dir}/panel_d.csv", output_path(config, "block2_fig2d"))
@@ -152,3 +153,7 @@ if __name__ == "__main__":
                output_path(config, "block2_current_csv"),
                output_path(config, "block2_fig2c"))
     print(f"wrote fig2b/c/d/e/g.png to {panels_dir}/")
+
+
+if __name__ == "__main__":
+    main(load_config("config.yaml"))
