@@ -33,8 +33,11 @@ comparable with a result in another.
 | [`src/block3/`](src/block3/README.md) | Fig. 3 A/B/C/D | Recurrent conductance-based spiking network at realistic sizes (`N_E = 4000`, `N_I = 1000`, `N_X = 4000`) — the main reproduction target; Fig. 3C–D is the paper's experimentally testable prediction |
 
 Each block holds the paper's own equations and exactly **one entry point**, `run.py`, with
-subcommands. Anything that is machinery rather than science lives in `src/lib`, and nothing
-in `src/lib` imports from a block.
+subcommands. Anything that is machinery rather than science lives in `src/lib`, and the
+shared estimators live in `src/analysis.py`. Dependencies run in whichever direction avoids
+restating the paper: `lib/glauber` imports block 2's S-Eq(1) connectivity rather than
+duplicating it, and a block may import another block where that is genuinely the same
+quantity.
 
 Fig. 2A and 2F are schematics in the paper, not simulations, so nothing is generated for
 them. Supplementary figures are out of scope.

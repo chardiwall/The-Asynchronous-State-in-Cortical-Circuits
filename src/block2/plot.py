@@ -10,21 +10,15 @@ this module draws all five.
 
 Usage: python -m block2.plot
 """
-import csv
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from config import load_config
+from lib.plotting import BLACK, BLUE, GREEN, ORANGE, RED, read_csv
 
-GREEN, RED, BLUE, BLACK, ORANGE = "#2ca02c", "#d62728", "#1f77b4", "#000000", "#e08214"
 EI_LAG_ZOOM_MS = 5.0   # half-width of 2D's and 2E's EI-Lag insets
-
-
-def _read_csv(path: str) -> list[dict]:
-    with open(path, newline="") as f:
-        return [{k: float(v) for k, v in row.items()} for row in csv.DictReader(f)]
 
 
 def _by_size(rows: list[dict]) -> dict[int, list[dict]]:
@@ -35,7 +29,7 @@ def _by_size(rows: list[dict]) -> dict[int, list[dict]]:
 
 
 def plot_fig2b(csv_path: str, out_path: str) -> None:
-    rows = _read_csv(csv_path)
+    rows = read_csv(csv_path)
     t = [r["t_ms"] for r in rows]
     fig, ax = plt.subplots(figsize=(6, 3.5))
     for key, color, width in (("E", GREEN, 1), ("X", BLUE, 1), ("Total", BLACK, 1.2), ("I", RED, 1)):
@@ -53,7 +47,7 @@ def plot_fig2d(csv_path: str, out_path: str) -> None:
     """z-scored m_E/m_I/m_X per network size, with an inset magnifying one instance of
     the E-to-I lag (the paper's "EI-Lag") in each panel.
     """
-    grouped = _by_size(_read_csv(csv_path))
+    grouped = _by_size(read_csv(csv_path))
     fig, axes = plt.subplots(len(grouped), 1, figsize=(6, 2.8 * len(grouped)), sharex=True)
     axes = np.atleast_1d(axes)
 
@@ -91,7 +85,7 @@ def plot_fig2e(csv_path: str, out_path: str,
     """
     if display_lag_ms is None:
         display_lag_ms = load_config("config.yaml")["binary_network"]["ccg"]["display_lag_ms"]
-    grouped = _by_size(_read_csv(csv_path))
+    grouped = _by_size(read_csv(csv_path))
     largest = max(grouped)
     rows = grouped[largest]
     lag = np.array([r["lag_ms"] for r in rows])
@@ -133,7 +127,7 @@ def plot_fig2e(csv_path: str, out_path: str,
 
 
 def plot_fig2g(csv_path: str, out_path: str) -> None:
-    r_values = [row["r"] for row in _read_csv(csv_path)]
+    r_values = [row["r"] for row in read_csv(csv_path)]
     fig, ax = plt.subplots(figsize=(5, 4))
     ax.hist(r_values, bins=100, color=GREEN, alpha=0.8)
     ax.axvline(float(np.mean(r_values)), color=BLACK, linestyle="--", linewidth=1)

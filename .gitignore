@@ -37,3 +37,6 @@ skills-lock.json
 # OS / editor
 .DS_Store
 *.swp
+
+# understand-anything knowledge graph
+.ua/

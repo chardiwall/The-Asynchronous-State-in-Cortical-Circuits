@@ -14,11 +14,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from config import load_config, output_path
-
-GREEN, RED, BLUE, BLACK, GOLD = "#2ca02c", "#d62728", "#1f77b4", "#000000", "#d4a017"
-
+from lib.plotting import BLACK, BLUE, GOLD, GREEN, RED
 
 def _read_csv(path: str) -> list[dict]:
+    """Rows as dicts with values left as STRINGS -- deliberately not lib.plotting.read_csv,
+    which floats every value. Fig. 3B's CSV carries a `kind` column of "measured"/"jittered",
+    so float-casting every column would raise. Callers float the numeric columns they use.
+    """
     with open(path, newline="") as f:
         return list(csv.DictReader(f))
 

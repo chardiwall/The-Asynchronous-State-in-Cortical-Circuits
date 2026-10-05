@@ -10,7 +10,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from block2.plot import BLACK, BLUE, GREEN, ORANGE, RED, _read_csv
+from lib.plotting import BLACK, BLUE, GREEN, ORANGE, RED, read_csv
 
 
 def _label(name: str) -> str:
@@ -53,8 +53,8 @@ def plot_fig2c(firing_csv: str, current_csv: str, out_path: str) -> None:
     realisation, and a NaN at the anchor size would otherwise delete an entire guide line
     without saying so.
     """
-    firing = _read_csv(firing_csv)
-    current = _read_csv(current_csv)
+    firing = read_csv(firing_csv)
+    current = read_csv(current_csv)
 
     # The two CSVs come from two independent Slurm arrays and each aggregates whatever task
     # output exists, so partial completion is normal and their size sets can differ. Plot
