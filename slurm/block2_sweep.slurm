@@ -23,5 +23,5 @@
 #SBATCH --time=20:00:00
 #SBATCH --output=artifacts/block2_full_pass/slurm_%a.out
 
-cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits.v2
+cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits
 PYTHONPATH=src .env/bin/python -m block2.run sweep "$SLURM_ARRAY_TASK_ID"

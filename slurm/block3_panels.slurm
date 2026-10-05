@@ -33,7 +33,7 @@ set -e
 apt-get update -qq
 apt-get install -y -qq python3.12-dev python3 build-essential time >/dev/null 2>&1
 
-cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits.v2
+cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits
 mkdir -p artifacts/block3_panels
 /usr/bin/time -v -o "artifacts/block3_panels/time.log" \
     env PYTHONPATH=src .env/bin/python -m block3.run panels

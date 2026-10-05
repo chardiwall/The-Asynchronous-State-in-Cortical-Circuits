@@ -31,7 +31,7 @@ set -e
 apt-get update -qq
 apt-get install -y -qq python3.12-dev python3 build-essential time >/dev/null 2>&1
 
-cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits.v2
+cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits
 mkdir -p artifacts/block3_vm_ccg
 /usr/bin/time -v -o "artifacts/block3_vm_ccg/time_${SLURM_ARRAY_TASK_ID}.log" \
     env PYTHONPATH=src .env/bin/python -m block3.run vm "$SLURM_ARRAY_TASK_ID"
