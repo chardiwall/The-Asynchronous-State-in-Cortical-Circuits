@@ -78,13 +78,18 @@ flagged at the top of [`src/block3/README.md`](src/block3/README.md).
 
 ```bash
 pip install -r requirements.txt
-pytest                                  # 169 tests
-python -m block1.run sweep              # see each block's README for the rest
+pytest                                           # 169 tests
+
+# Every run is from the repo root with PYTHONPATH=src:
+PYTHONPATH=src python -m block1.run sweep        # see each block's README for the rest
 ```
 
 `pytest.ini` sets `pythonpath = src`, so the modules import as `analysis`, `config`,
-`block1`, `lib`, and so on. There is no packaging step — this is a reference
-implementation to read, run and cite against the paper, not a library to install.
+`block1`, `lib`, and so on — but that setting applies to **pytest only**. Running a module
+directly needs `PYTHONPATH=src` on the command line, as every command in the block READMEs
+and the Slurm scripts does; without it you get `ModuleNotFoundError: No module named
+'block1'`. There is no packaging step — this is a reference implementation to read, run and
+cite against the paper, not a library to install.
 
 ## Conventions
 
