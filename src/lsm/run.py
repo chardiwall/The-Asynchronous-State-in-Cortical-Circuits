@@ -1,6 +1,7 @@
 """The LSM extension's one entry point.
 
-    python -m lsm.run calibrate                       input gains matching faithful's E rate
+    python -m lsm.run calibrate                       background input gains (faithful's E rate)
+    python -m lsm.run calibrate_task <dataset>        stimulus input gains (faithful's task rate)
     python -m lsm.run asynchrony <task_index>         one (variant, N, network) background run
     python -m lsm.run features <dataset> <variant|input> <chunk>   reservoir features, one chunk
     python -m lsm.run nchunks <dataset>               chunk count, for the Slurm array
@@ -33,31 +34,6 @@ def asynchrony_grid(config: dict) -> list[dict]:
     cells += [(v, lsm["size"]) for v in lsm["variants"] if v != "faithful"]
     return [{"variant": v, "n": n, "network_index": k}
             for v, n in cells for k in range(lsm["asynchrony"]["n_networks"])]
-
-
-def calibrate(config: dict) -> dict:
-    """Bisection on log input gain so each non-faithful variant's background E rate matches
-    the faithful variant's at lsm.size. E rate grows monotonically with input gain."""
-    lsm = config["lsm"]
-    length_s = lsm["calibration"]["length_s"]
-
-    def e_rate(variant, gain):
-        trial = {**config, "lsm": {**lsm, "input_gain": {**lsm["input_gain"], variant: gain}}}
-        rate = run_background(trial, variant, lsm["size"], 0, length_s, record_currents=False)["rate_excitatory_hz"]
-        print(f"  {variant} gain={gain:.3f} -> E {rate:.3f} Hz", flush=True)
-        return rate
-
-    target = e_rate("faithful", 1.0)
-    gains = {"faithful": 1.0, "target_rate_excitatory_hz": target}
-    for variant in lsm["variants"]:
-        if variant == "faithful":
-            continue
-        low, high = (math.log(g) for g in lsm["calibration"]["gain_bounds"])
-        for _ in range(lsm["calibration"]["iterations"]):
-            mid = 0.5 * (low + high)
-            low, high = (mid, high) if e_rate(variant, math.exp(mid)) < target else (low, mid)
-        gains[variant] = math.exp(0.5 * (low + high))
-    return gains
 
 
 def task_references(config: dict, name: str) -> tuple[list, int]:
@@ -136,12 +112,21 @@ def main():
     command = sys.argv[1]
     config = load_config("config.yaml")
     if command == "calibrate":
+        from lsm.calibrate import calibrate
+
         gains = calibrate(config)
         path = output_path(config, "lsm_calibration_json")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             json.dump(gains, f, indent=1)
         print(gains)
+    elif command == "calibrate_task":
+        from lsm.calibrate import calibrate_task
+
+        dataset = config["lsm"]["datasets"][sys.argv[2]]
+        references, _ = task_references(config, sys.argv[2])
+        n = config["lsm"]["calibration"]["task_samples"]
+        print(calibrate_task(config, dataset, _load(dataset, references[:n])))
     elif command == "asynchrony":
         task = asynchrony_grid(config)[int(sys.argv[2])]
         row = run_background(config, task["variant"], task["n"], task["network_index"],

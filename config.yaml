@@ -429,9 +429,15 @@ lsm:
       # 3.011 and 2.884 against an UNscaled X path; at N_X=400 that path is sqrt(10) weaker,
       # so these are 3.011/sqrt(10) and 2.884/sqrt(10) -- the same networks. Rerun after any
       # change to the variants.
+  task_input_gain:              # the same gain for classification runs, CALIBRATED by
+    faithful: 1.0               # `lsm.run calibrate_task` to faithful's mean reservoir rate
+    dense_weak: 1.0             # during training stimuli. PLACEHOLDERS until calibrated.
+    maass: 1.0
   calibration:
     length_s: 5.0
     gain_bounds: [0.3, 12.0]
+    task_gain_bounds: [0.05, 2.0]
+    task_samples: 6             # training samples (dvs_gesture) the task gains are fit on
     iterations: 8               # bisection on log-gain
   asynchrony:                   # background-only runs: block 3's Poisson X at 2.5 Hz
     sizes: [250, 500, 1000, 2000, 5000]   # faithful family; the others at lsm.size only

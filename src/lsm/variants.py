@@ -22,8 +22,11 @@ from block3.connectivity import generate_bernoulli_connectivity
 PRE_POPULATION_SIZE_KEY = {"E": "n_excitatory", "I": "n_inhibitory", "X": "n_external"}
 
 
-def network_params(config: dict, variant: str, n: int, n_external: int) -> dict:
-    """block3.model.build_network's params for `variant` at N = n recurrent neurons."""
+def network_params(config: dict, variant: str, n: int, n_external: int,
+                   gain_key: str = "input_gain") -> dict:
+    """block3.model.build_network's params for `variant` at N = n recurrent neurons.
+    `gain_key` picks the calibrated input gain: "input_gain" (matched background rate) or
+    "task_input_gain" (matched stimulus-driven rate)."""
     lsm = config["lsm"]
     paper = config["spiking_network"]
     params = copy.deepcopy(paper)
@@ -37,7 +40,7 @@ def network_params(config: dict, variant: str, n: int, n_external: int) -> dict:
     for name in (*scaled, "g_EX", "g_IX"):   # the X pathway is sqrt-scaled in every variant
         key = PRE_POPULATION_SIZE_KEY[name[-1]]
         g[name] *= math.sqrt(paper["populations"][key] / params["populations"][key])
-    gain = lsm["input_gain"][variant]
+    gain = lsm[gain_key][variant]
     g["g_EX"] *= gain
     g["g_IX"] *= gain
     return params

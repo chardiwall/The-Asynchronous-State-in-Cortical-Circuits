@@ -43,7 +43,7 @@ def chunk_features(config: dict, dataset: dict, variant: str, samples: list, q: 
     if variant == "input":
         return bin_counts(idx, t_ms, n_x, onsets, dataset["window_ms"], dataset["n_bins"]), labels
 
-    params = network_params(config, variant, lsm["size"], n_x)
+    params = network_params(config, variant, lsm["size"], n_x, gain_key="task_input_gain")
     params["external_input"] = {"kind": "spike_generator", "indices": idx, "times_ms": t_ms}
     net_rng = np.random.default_rng(config["seed"])  # one fixed reservoir per variant
     net = build_network(params, net_rng, connect=build_connect(config, variant, params, net_rng))
