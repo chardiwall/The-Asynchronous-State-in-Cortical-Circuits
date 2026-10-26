@@ -77,13 +77,16 @@ How can dense networks be asynchronous? Shared input should force correlations o
 - The strong coupling that cancels correlations also makes the network generate its own
   irregular activity. That activity decorrelates neurons from each other *and* from trial to
   trial: high dimensionality (participation ratio 179 against 10), mostly noise.
-- N = 2000 test: see `lsm_technical.md` §6.3 — does averaging over more neurons recover it?
+- `lsm_size_effect.png`: quadruple N to 2000 and the faithful liquid gains +4.45 points on
+  N-MNIST against +0.5 for Maass. Its noise averages out across neurons, but it is still
+  behind (95.75 % against 97.6 %).
 
 **14. Take-home (1 min).**
 - The paper's mechanism reproduces quantitatively, at every level of the argument.
 - An LSM can be made faithful to it, and it then becomes asynchronous by cancellation. This
   requires √K-scaled strong coupling.
 - For computation, asynchrony through chaotic balance trades reliability for decorrelation.
-  A good liquid needs input-locked diversity, not decorrelation as such.
+  A good liquid needs input-locked diversity, not decorrelation as such. The deficit shrinks
+  with N, so it is a finite-size cost, not a dead end.
 - Next: balanced networks in a less chaotic regime (weaker coupling, or slower inhibition), or
   readouts that average over population noise.

@@ -234,16 +234,51 @@ the two repeats (`lsm.readout.reliability`, unbiased for the stimulus-locked sha
   deterministic given the input (0.88–0.99). For a linear readout with ~10³–10⁴ training
   samples, reliability wins.
 
-### 6.2 Does a larger faithful reservoir recover?
+### 6.2 Does a larger faithful reservoir recover? Partly
 
-The asynchronous state's noise is independent across neurons, which is the paper's point,
-so a readout over more neurons should be able to average it away; the Maass liquid's shared
-modes cannot be averaged. Faithful and Maass at **N = 2000**: see §6.3 (filled in when the
-runs land). The per-neuron reliability does not change with N (faithful 0.68 / 0.31, Maass
-0.99 / 0.88 for Gesture / N-MNIST), so any gain must come from averaging across neurons.
-Caveat: at N = 2000 the faithful reservoir runs at ~13 Hz under stimulus against ~40 Hz at
-N = 500. The input path is unchanged, and the stronger balance at larger K suppresses the
-response.
+The asynchronous state's noise is independent across neurons (the paper's point), so a readout
+over more neurons should average it away; the Maass liquid's shared modes cannot be averaged
+the same way. Both variants were rerun at **N = 2000**, with the same encoding, gains and
+readout:
+
+![accuracy vs N](figures/lsm_size_effect.png)
+
+| test accuracy | N = 500 | N = 2000 | gain | participation ratio at 2000 |
+|---|---|---|---|---|
+| N-MNIST faithful | 91.3 % | **95.75 %** | **+4.45** | 866 |
+| N-MNIST maass | 97.1 % | 97.6 % | +0.5 | 10.5 |
+| Gesture faithful | 53.8 % | 58.7 % | +4.9 | 214 |
+| Gesture maass | 60.6 % | 62.5 % | +1.9 | 5.5 |
+
+- Quadrupling N buys the faithful liquid **~9× more accuracy than the Maass liquid on
+  N-MNIST** (+4.45 against +0.5). The gap shrinks from 5.8 to 1.85 points, which is what
+  averaging out neuron-independent noise predicts. Per-neuron reliability is unchanged
+  (faithful 0.31 at N = 2000 against 0.28 at N = 500), so the gain comes from the population,
+  not from quieter neurons.
+- The faithful liquid **is still behind at N = 2000**, outside the N-MNIST interval
+  (±0.9 points). On Gesture the intervals overlap at both sizes.
+- Caveat: at N = 2000 the faithful reservoir fires at ~13 Hz under stimulus, against ~40 Hz at
+  N = 500 (same input path, stronger balance at larger K). Its gain is therefore not from
+  more spikes.
+
+### 6.3 Conclusions
+
+1. **The claim transfers.** A 500-neuron LSM built faithfully to the paper's argument is in
+   the asynchronous state by the paper's mechanism. r̄ follows the N-scaling all the way to
+   the paper's own network, and the cancellation is visible term by term in the currents.
+2. **Faithfulness has a precise price.** The coupling must be rescaled as
+   `g ∝ √(N_paper/N)`; a literal shrink of the paper's network is silent. Dense wiring alone
+   (dense_weak) leaves the network only partially cancelled. Classic Maass liquids are not
+   asynchronous by this mechanism: they inherit their input's correlations, about 3× higher.
+3. **Faithful is not a better liquid, at least at N ≤ 2000 with a linear readout.** The same
+   strong coupling that cancels correlations makes the network generate its own irregular
+   activity. That decorrelates neurons, but also decorrelates the response across trials.
+   The Maass liquid's low-dimensional, almost deterministic state classifies better.
+4. **Where it could pay off.** The faithful liquid's deficit shrinks with N, as averaging
+   predicts. It may close at larger N, with more training data, or with readouts designed to
+   average population noise (e.g. pooling over neurons before the classifier). Testing
+   N = 5000–10 000 and a less chaotic balanced regime (weaker J, slower inhibition) are the
+   natural next experiments.
 
 ## 7. Reproduce
 
@@ -255,6 +290,11 @@ python src/lsm/prepare_nmnist.py <tonic dir> <out dir>      # once, needs tonic
 for v in input faithful dense_weak maass; do
   sbatch --array=0-13 slurm/lsm_features.slurm dvs_gesture $v
   sbatch --array=0-23 slurm/lsm_features.slurm nmnist $v
+  for d in dvs_gesture nmnist; do sbatch slurm/lsm_reliability.slurm $d $v; done
+done
+for v in faithful maass; do                                 # the N = 2000 runs
+  sbatch --array=0-13 slurm/lsm_features.slurm dvs_gesture $v 2000
+  sbatch --array=0-23 slurm/lsm_features.slurm nmnist $v 2000
 done
 PYTHONPATH=src python -m lsm.run aggregate
 PYTHONPATH=src python -m lsm.run readout dvs_gesture && PYTHONPATH=src python -m lsm.run readout nmnist

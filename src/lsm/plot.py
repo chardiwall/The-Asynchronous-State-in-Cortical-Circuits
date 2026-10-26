@@ -124,6 +124,26 @@ def plot_readout(rows, out_path):
     fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
 
 
+def plot_size_effect(rows, base_size, out_path):
+    """Test accuracy of faithful vs maass at lsm.size and at every <variant>_N<N> size run."""
+    datasets = sorted({r["dataset"] for r in rows})
+    fig, axes = plt.subplots(1, len(datasets), figsize=(4.5 * len(datasets), 3.6))
+    for ax, d in zip(np.atleast_1d(axes), datasets):
+        for v in ("faithful", "maass"):
+            points = sorted((base_size if r["variant"] == v else int(r["variant"].split("_N")[1]),
+                             100 * float(r["test_accuracy"]), int(float(r["n_test"])))
+                            for r in rows if r["dataset"] == d and r["variant"].split("_N")[0] == v)
+            n, acc, n_test = (np.array(x) for x in zip(*points))
+            ci = 196 * np.sqrt(acc / 100 * (1 - acc / 100) / n_test)
+            ax.errorbar(n, acc, ci, fmt="o-", color=VARIANT_COLOUR[v], lw=2, ms=8, capsize=4, label=VARIANT_LABEL[v])
+            for x, a in zip(n, acc):
+                ax.annotate(f"{a:.1f}%", (x, a), textcoords="offset points", xytext=(8, -4), fontsize=8)
+        ax.set(xscale="log", xlabel="N (recurrent neurons)", ylabel="test accuracy (%)", title=DATASET_LABEL.get(d, d))
+        ax.legend(frameon=False, fontsize=8)
+        _style(ax, n)
+    fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
+
+
 def plot_reliability(rows, out_path):
     """Stimulus-locked share of each liquid's state (lsm.readout.reliability), per dataset."""
     datasets = sorted({r["dataset"] for r in rows})
@@ -162,5 +182,8 @@ def main(config: dict) -> None:
         plot_reliability([r for r in reliability if "_N" not in r["variant"]], f"{out_dir}/lsm_reliability.png")
     readout_csv = output_path(config, "lsm_readout_csv")
     if os.path.exists(readout_csv):
-        plot_readout(_rows(readout_csv), f"{out_dir}/lsm_readout.png")
+        readout = _rows(readout_csv)
+        plot_readout([r for r in readout if "_N" not in r["variant"]], f"{out_dir}/lsm_readout.png")
+        if any("_N" in r["variant"] for r in readout):
+            plot_size_effect(readout, config["lsm"]["size"], f"{out_dir}/lsm_size_effect.png")
     print(f"LSM figures in {out_dir}/")
