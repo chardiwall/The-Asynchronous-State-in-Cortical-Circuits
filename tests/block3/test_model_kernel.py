@@ -38,3 +38,18 @@ def test_external_spike_produces_the_closed_form_conductance_in_every_target():
     assert expected.max() > 0.5            # the spike reached somebody
     assert np.max(np.abs(measured - expected)) < 0.01 * expected.max()  # rk2 error only
     assert abs(measured.sum() - expected.sum()) < 0.02 * expected.sum()
+
+
+def test_a_supplied_connectivity_rule_replaces_the_bernoulli_draw():
+    # A liquid state machine's own topology (e.g. Maass 2002's distance-dependent column)
+    # must be able to replace S-p.20-21's Bernoulli(p) wiring without a second model.
+    edges = {"EE": ([0, 1], [1, 2]), "IE": ([3], [0]), "EI": ([], []), "II": ([0], [1]),
+             "EX": ([5, 5, 6], [0, 1, 2]), "IX": ([7], [4])}
+
+    def connect(name, n_pre, n_post, rng, exclude_self):
+        pre, post = edges[name]
+        return np.asarray(pre, dtype=np.int32), np.asarray(post, dtype=np.int32)
+
+    net = build_network(SMALL_PARAMS, rng=np.random.default_rng(3), connect=connect)
+    for name, (pre, post) in edges.items():
+        assert list(net.synapses[name].i) == pre and list(net.synapses[name].j) == post

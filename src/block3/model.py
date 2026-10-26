@@ -63,7 +63,7 @@ class Block3Network:
 
 
 def _build_synapse(source, target, channel, mean_g_nS, std_fraction, delay_range_ms,
-                   tau_r, tau_tilde, p, rng, name, exclude_self):
+                   tau_r, tau_tilde, connect, rng, name, exclude_self):
     # Explicit namespace, not Brian2's implicit frame-capture default: build_network()
     # constructs objects but a caller elsewhere calls .run() on the returned Network, in a
     # different frame -- implicit capture would look for tau_r/tau_tilde there and fail.
@@ -76,7 +76,9 @@ def _build_synapse(source, target, channel, mean_g_nS, std_fraction, delay_range
     # connect(p=...) + reading len(synapse) back afterwards -- required for cpp_standalone
     # -- standalone defers connect(p=...)'s resolution into generated
     # code, so Python can't learn the realised synapse count before that code has run.
-    pre_index, post_index = generate_bernoulli_connectivity(len(source), len(target), p, rng, exclude_self)
+    pre_index, post_index = connect(name, len(source), len(target), rng, exclude_self)
+    if len(pre_index) == 0:  # Brian2 rejects an empty edge list; a sparse topology may give one
+        return synapse
     synapse.connect(i=pre_index, j=post_index)
 
     n = len(pre_index)
@@ -86,7 +88,10 @@ def _build_synapse(source, target, channel, mean_g_nS, std_fraction, delay_range
     return synapse
 
 
-def build_network(params: dict, rng: np.random.Generator) -> Block3Network:
+def build_network(params: dict, rng: np.random.Generator, connect=None) -> Block3Network:
+    """`connect(name, n_pre, n_post, rng, exclude_self) -> (pre_index, post_index)` wires
+    each ordered population pair (name e.g. "EI" = I -> E). Default: S-p.20-21's Bernoulli(p).
+    """
     b2.start_scope()
     # No b2.seed() needed: connectivity is now generated in numpy (generate_bernoulli_
     # connectivity), not Brian2's own connect(p=...), so `rng` alone controls every random
@@ -97,6 +102,9 @@ def build_network(params: dict, rng: np.random.Generator) -> Block3Network:
     n_i = params["populations"]["n_inhibitory"]
     n_x = params["populations"]["n_external"]
     p = params["connection_probability"]
+    if connect is None:
+        def connect(name, n_pre, n_post, rng, exclude_self):
+            return generate_bernoulli_connectivity(n_pre, n_post, p, rng, exclude_self)
 
     neuron = params["neuron"]
     g_L = neuron["g_L_nS"] * b2.nS
@@ -157,7 +165,7 @@ def build_network(params: dict, rng: np.random.Generator) -> Block3Network:
     }
     synapses = {
         name: _build_synapse(source, target, channel, mean_g, std_fraction, delay_range,
-                             tau_r, tau_tilde, p, rng, name, exclude_self)
+                             tau_r, tau_tilde, connect, rng, name, exclude_self)
         for name, (source, target, channel, mean_g, delay_range, exclude_self) in specs.items()
     }
 

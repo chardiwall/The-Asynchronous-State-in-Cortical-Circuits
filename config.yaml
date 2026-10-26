@@ -45,6 +45,12 @@ outputs:
   block3_fig3b_correlations_csv: block3_panels/fig3b_correlations.csv
   block3_vm_ccg_dir: block3_vm_ccg
   block3_vm_ccg_csv: block3_vm_ccg.csv
+  lsm_calibration_json: lsm/calibration.json
+  lsm_asynchrony_dir: lsm/asynchrony
+  lsm_asynchrony_csv: lsm/asynchrony.csv
+  lsm_features_dir: lsm/features
+  lsm_readout_csv: lsm/readout.csv
+  lsm_figures_dir: lsm/figures
   block3_fig3a: block3_panels/fig3a.png
   block3_fig3b: block3_panels/fig3b.png
   block3_fig3c: block3_panels/fig3c.png
@@ -388,3 +394,79 @@ analysis:
 # ---------------------------------------------------------------------------
 qualitative_checks:
   increasing_trend_min_correlation: 0.8
+
+# ---------------------------------------------------------------------------
+# Liquid state machine extension -- NOT in the paper (src/lsm/). Asks whether the paper's
+# asynchronous state survives in a reservoir-sized network, and whether a reservoir built
+# faithfully to the paper's argument is a better liquid for event-camera classification.
+# Every variant is block3.model.build_network with different parameters: one model code.
+# ---------------------------------------------------------------------------
+lsm:
+  size: 500                     # N = N_E + N_I. Chosen, not derived: the smallest N at which
+    # the paper's strong-coupling regime still has sqrt(K) >> 1 (K_EE = p*N_E = 80, sqrt = 9),
+    # and in the range of event-data LSMs (Maass 2002 used 135). Fig. 2C's grid has N = 562.
+  excitatory_fraction: 0.8      # 4:1, as block 3 (4000:1000) and Maass 2002
+  external_per_recurrent: 0.8   # N_X = 0.8 N on background-only runs, as block 3's N_X = N_E
+  paper_size: 5000              # block 3's N_E + N_I, the network every variant derives from
+  variants:                     # topology: bernoulli (S-p.20-21) or column (Maass 2002)
+    faithful:   {topology: bernoulli, coupling: sqrt_scaled}
+      # g_ab(N) = g_ab^paper * sqrt(N_b^paper / N_b): the balanced-state strong-coupling
+      # rule (J ~ 1/sqrt(K)) that the paper's theory rests on (binary model: j_ab/sqrt(N)).
+      # Keeps K_b * g_ab^2 fixed. Measured: N=500 E 1.26 Hz / I 3.85 Hz; unscaled it is silent.
+    dense_weak: {topology: bernoulli, coupling: paper_nS}   # ablation: dense, weak coupling
+    maass:      {topology: column,    coupling: paper_nS}   # the classic LSM liquid
+  column:                       # Maass, Natschlaeger & Markram 2002, Neural Comput. 14:2531
+    cross_section: [5, 5]       # 15x3x3 there for N=135; length = ceil(N / 25) here
+    lambda: 2.0
+    c: {EE: 0.3, IE: 0.2, EI: 0.4, II: 0.1}   # post<-pre naming: "IE" is Maass's E->I (0.2),
+      # "EI" his I->E (0.4). X -> reservoir stays Bernoulli(connection_probability) in every
+      # variant, so the variants differ only in their recurrent wiring and coupling.
+  input_gain:                   # multiplies the (sqrt-scaled, shared) g_EX and g_IX.
+    faithful: 1.0               # no free parameter: derived from the paper
+    dense_weak: 0.952           # CALIBRATED 2026-10-26 by `lsm.run calibrate` (N=500, 5 s,
+    maass: 0.912                # seed 1234): background E rate matched to faithful's 1.41 Hz
+      # (dense_weak 1.47 Hz, maass 1.29-1.52 Hz at the bracketing gains). The run reported
+      # 3.011 and 2.884 against an UNscaled X path; at N_X=400 that path is sqrt(10) weaker,
+      # so these are 3.011/sqrt(10) and 2.884/sqrt(10) -- the same networks. Rerun after any
+      # change to the variants.
+  calibration:
+    length_s: 5.0
+    gain_bounds: [0.3, 12.0]
+    iterations: 8               # bisection on log-gain
+  asynchrony:                   # background-only runs: block 3's Poisson X at 2.5 Hz
+    sizes: [250, 500, 1000, 2000, 5000]   # faithful family; the others at lsm.size only
+    length_s: 100.0
+    n_networks: 3
+    n_current_cells: 100        # E cells whose I_E/I_I/I_X are recorded for c-components
+    current_sample_ms: 1.0
+  tasks:                        # event-camera classification through each variant
+    background_hz: 2.5          # block 3's X rate, kept on every input channel
+    target_input_rate_hz: 20.0  # mean per-channel STIMULUS rate after thinning (not a paper
+      # value): ~8x the background, inside the balanced network's linear-response range
+    gap_ms: 50.0                # silence between samples, ~3 tau_m, so states do not carry over
+    seed_offset: 77             # input-thinning / background RNG, separate from the network's
+    thinning_samples: 500       # training samples the keep-probability is estimated from
+  datasets:
+    nmnist:                     # Orchard et al. 2015; 34x34 ATIS saccades, 10 classes
+      format: nmnist
+      root: ~/programs/datasets/processed/nmnist
+      sensor: [34, 34]
+      pool: 2                   # -> 17x17x2 = 578 input channels
+      window_ms: 300.0          # the three saccades
+      n_bins: 6                 # readout bins of 50 ms (= the paper's count window T)
+      n_train: 10000            # random subset of the 60000 (compute budget)
+      n_test: 2000              # random subset of the 10000
+      chunk: 500
+    dvs_gesture:                # Amir et al. 2017; 128x128 DVS128, 11 classes
+      format: dvs_gesture
+      root: ~/programs/lsm-design-space/data/raw/DVSGesture   # read-only raw data
+      sensor: [128, 128]
+      pool: 8                   # -> 16x16x2 = 512 input channels
+      window_ms: 1500.0         # first 1.5 s of each recording
+      n_bins: 10                # readout bins of 150 ms
+      n_train: null             # all 1077
+      n_test: null              # all 264
+      chunk: 100
+  readout:                      # multinomial logistic regression on standardised bin counts;
+    C: 0.01                     # scaler and model fit on the training split only
+    max_iter: 3000
