@@ -29,8 +29,10 @@
 #SBATCH --container-writable
 
 set -e
-apt-get update -qq
-apt-get install -y -qq python3.12-dev python3 build-essential time >/dev/null 2>&1
+# Skipped when the image already has the headers. Submit with a prebuilt image to avoid
+# Docker Hub's pull rate limit (HTTP 429 when ~100 array tasks start at once):
+#   sbatch --container-image=$HOME/.local/share/asyncstate-py312.sqsh <script>
+[ -f /usr/include/python3.12/Python.h ] || { apt-get update -qq && apt-get install -y -qq python3.12-dev python3 build-essential time >/dev/null 2>&1; }
 
 cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits
 mkdir -p artifacts/block3_panels
