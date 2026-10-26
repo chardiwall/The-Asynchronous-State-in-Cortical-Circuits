@@ -124,6 +124,24 @@ def plot_readout(rows, out_path):
     fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
 
 
+def plot_reliability(rows, out_path):
+    """Stimulus-locked share of each liquid's state (lsm.readout.reliability), per dataset."""
+    datasets = sorted({r["dataset"] for r in rows})
+    order = [v for v in ("input", "faithful", "dense_weak", "maass") if any(r["variant"] == v for r in rows)]
+    fig, axes = plt.subplots(1, len(datasets), figsize=(4.5 * len(datasets), 3.6), sharey=True)
+    for ax, d in zip(np.atleast_1d(axes), datasets):
+        value = [next((float(r["reliability"]) for r in rows if r["dataset"] == d and r["variant"] == v), np.nan)
+                 for v in order]
+        ax.bar(range(len(order)), value, color=[VARIANT_COLOUR[v] for v in order], width=0.7, edgecolor="white")
+        for i, x in enumerate(value):
+            ax.text(i, x + 0.02, f"{x:.2f}", ha="center", va="bottom", fontsize=9)
+        ax.set_xticks(range(len(order)), [VARIANT_LABEL[v].replace(" (", "\n(") for v in order], fontsize=7)
+        ax.set(ylim=(0, 1.1), title=DATASET_LABEL.get(d, d))
+        _style(ax)
+    np.atleast_1d(axes)[0].set_ylabel("stimulus-locked share of state variance")
+    fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
+
+
 def main(config: dict) -> None:
     out_dir = output_path(config, "lsm_figures_dir")
     os.makedirs(out_dir, exist_ok=True)
@@ -135,6 +153,13 @@ def main(config: dict) -> None:
             if f"c_total{suffix}" in rows[0] and rows[0][f"c_total{suffix}"]:
                 plot_currents(rows, config["lsm"]["size"], f"{out_dir}/lsm_currents{tag}.png", suffix)
                 plot_current_scaling(rows, f"{out_dir}/lsm_current_scaling{tag}.png", suffix)
+    import glob
+    import json
+
+    reliability = [json.load(open(p)) for p in
+                   sorted(glob.glob(f"{output_path(config, 'lsm_features_dir')}/*/reliability_*.json"))]
+    if reliability:
+        plot_reliability([r for r in reliability if "_N" not in r["variant"]], f"{out_dir}/lsm_reliability.png")
     readout_csv = output_path(config, "lsm_readout_csv")
     if os.path.exists(readout_csv):
         plot_readout(_rows(readout_csv), f"{out_dir}/lsm_readout.png")
