@@ -472,6 +472,6 @@ lsm:
       n_test: null              # all 264
       chunk: 100
   readout:                      # multinomial logistic regression on standardised bin counts;
-    C_grid: [0.001, 0.01, 0.1, 1.0]   # inverse L2 strength, chosen per variant on a
+    C_grid: [0.001, 0.01, 0.1, 1.0, 10.0]   # inverse L2 strength, chosen per variant on a
     validation_fraction: 0.2    # held-out slice of the TRAINING split, then refit on all of it
     max_iter: 3000
