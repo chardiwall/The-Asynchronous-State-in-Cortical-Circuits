@@ -24,7 +24,8 @@ from lsm.encode import count_samples, load_samples, subsample_indices
 ASYNCHRONY_FIELDS = ["variant", "n", "network_index", "length_s", "rate_excitatory_hz",
                      "rate_inhibitory_hz", "r_bar", "sigma_r", "sigma_r_jittered", "n_pairs_defined",
                      "tracking_EI", "tracking_EX", "c_EE", "c_II", "c_XX", "c_EI", "c_EX", "c_IX",
-                     "c_total"]
+                     "c_total", "c_EE_T", "c_II_T", "c_XX_T", "c_EI_T", "c_EX_T", "c_IX_T",
+                     "c_total_T"]
 
 
 def asynchrony_grid(config: dict) -> list[dict]:

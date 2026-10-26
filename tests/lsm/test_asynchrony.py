@@ -14,3 +14,7 @@ def test_background_run_reports_rates_correlations_and_an_exact_current_decompos
     parts = row["c_EE"] + row["c_II"] + row["c_XX"] + 2 * (row["c_EI"] + row["c_EX"] + row["c_IX"])
     assert np.isclose(parts, row["c_total"])
     assert row["c_EI"] < 0  # inhibitory and excitatory components anti-correlate: cancellation
+    # the same decomposition on currents averaged over the count window T (SOM Fig. S6's
+    # filtered-current correlation): still an exact identity
+    parts_T = row["c_EE_T"] + row["c_II_T"] + row["c_XX_T"] + 2 * (row["c_EI_T"] + row["c_EX_T"] + row["c_IX_T"])
+    assert np.isclose(parts_T, row["c_total_T"])

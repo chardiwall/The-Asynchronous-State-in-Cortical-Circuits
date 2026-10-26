@@ -5,7 +5,8 @@
   r_bar, sigma_r  spike-count correlation over E pairs, T = 50 ms (S-Eq 34-37), and sigma_r
                   of a +-500 ms jittered surrogate -- the estimator-noise null of Fig. 3B
   c components    the E/I/X current decomposition of M-Eq 3, with block 2's common-
-                  normalisation estimator so c = c_EE + c_II + c_XX + 2(c_EI + c_EX + c_IX)
+                  normalisation estimator so c = c_EE + c_II + c_XX + 2(c_EI + c_EX + c_IX),
+                  on 1 ms currents and (suffix _T) on currents averaged over T = 50 ms
   tracking        zero-lag correlation of z-scored population activity, E vs I and E vs X
                   (Fig. 3A's 3 ms bins): the mechanism -- inhibition tracking excitation
 """
@@ -79,4 +80,11 @@ def run_background(config: dict, variant: str, n: int, network_index: int, lengt
         components = np.stack([np.asarray(getattr(monitor, k) / b2.nA)[:, keep]
                                for k in ("I_E", "I_I", "I_X")])
         row.update(current_component_correlations(components))
+        # Spikes respond to the current low-passed over ~T, not to its 1 ms shot noise, which
+        # is faster than inhibition can track. So the decomposition is repeated on currents
+        # boxcar-averaged over the count window T (cf. SOM Fig. S6, filtered currents).
+        width = int(round(analysis["count_window_T_ms"] / lsm["asynchrony"]["current_sample_ms"]))
+        cumulative = np.cumsum(components, axis=2)
+        filtered = (cumulative[:, :, width:] - cumulative[:, :, :-width]) / width
+        row.update({f"{k}_T": v for k, v in current_component_correlations(filtered).items()})
     return row
