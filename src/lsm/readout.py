@@ -17,6 +17,16 @@ def participation_ratio(x) -> float:
     return float(eigenvalues.sum() ** 2 / (eigenvalues ** 2).sum())
 
 
+def reliability(x1, x2) -> float:
+    """Fraction of feature variance that is stimulus-locked: the same samples presented twice
+    with independent noise (background, thinning), sum_f cov(x1_f, x2_f) / sum_f (var x1_f +
+    var x2_f)/2 across samples. Noise independent between repeats cancels in the covariance,
+    so this is 1 for a deterministic liquid and 0 for one whose state ignores its input."""
+    a = np.asarray(x1, dtype=np.float64) - np.mean(x1, axis=0)
+    b = np.asarray(x2, dtype=np.float64) - np.mean(x2, axis=0)
+    return float((a * b).sum() / (0.5 * ((a ** 2).sum() + (b ** 2).sum())))
+
+
 def _fit(x, y, c, max_iter):
     scaler = StandardScaler().fit(x)
     return scaler, LogisticRegression(C=c, max_iter=max_iter).fit(scaler.transform(x), y)

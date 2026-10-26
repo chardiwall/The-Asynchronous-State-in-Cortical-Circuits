@@ -42,3 +42,15 @@ def test_participation_ratio_counts_effective_dimensions():
     assert abs(participation_ratio(isotropic) - 10) < 0.3
     rank_one = np.outer(rng.normal(size=5000), rng.normal(size=8))
     assert abs(participation_ratio(rank_one) - 1) < 1e-6
+
+
+def test_reliability_is_one_for_identical_repeats_and_zero_for_independent_ones():
+    from lsm.readout import reliability
+
+    rng = np.random.default_rng(3)
+    signal = rng.normal(size=(400, 50))
+    assert abs(reliability(signal, signal) - 1.0) < 1e-12
+    assert abs(reliability(signal, rng.normal(size=(400, 50)))) < 0.05
+    # half signal, half independent noise of equal variance -> 0.5
+    noisy = lambda: signal + rng.normal(size=signal.shape)
+    assert abs(reliability(noisy(), noisy()) - 0.5) < 0.05

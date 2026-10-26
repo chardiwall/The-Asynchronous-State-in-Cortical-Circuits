@@ -6,6 +6,7 @@
     python -m lsm.run features <dataset> <variant|input> <chunk>   reservoir features, one chunk
     python -m lsm.run nchunks <dataset>               chunk count, for the Slurm array
     python -m lsm.run readout <dataset>               train/test every variant's readout
+    python -m lsm.run reliability <dataset> <variant> stimulus-locked share of the liquid state
     python -m lsm.run aggregate                       asynchrony task rows -> CSV
     python -m lsm.run plot                            every LSM figure
 """
@@ -74,6 +75,29 @@ def features(config: dict, name: str, variant: str, chunk: int) -> str:
     return path
 
 
+def repeat_reliability(config: dict, name: str, variant: str) -> dict:
+    """The first lsm.reliability.n_samples TEST samples through one variant twice, with
+    independent thinning/background noise but the same reservoir: the stimulus-locked
+    fraction of the liquid state's variance (lsm.readout.reliability)."""
+    from lsm.readout import reliability
+    from lsm.reservoir import chunk_features, thinning
+
+    dataset = config["lsm"]["datasets"][name]
+    references, n_train = task_references(config, name)
+    n = config["lsm"]["reliability"]["n_samples"]
+    q = thinning(config, dataset, _load(dataset, references[:min(n_train, config["lsm"]["tasks"]["thinning_samples"])]))
+    samples = _load(dataset, references[n_train:n_train + n])
+    first, second = (chunk_features(config, dataset, variant, samples, q, seed)[0]
+                     for seed in config["lsm"]["reliability"]["noise_streams"])
+    row = {"dataset": name, "variant": variant, "n_samples": len(samples),
+           "reliability": reliability(first, second)}
+    path = f"{output_path(config, 'lsm_features_dir')}/{name}/reliability_{variant}.json"
+    with open(path, "w") as f:
+        json.dump(row, f)
+    print(row, flush=True)
+    return row
+
+
 def readout(config: dict, name: str) -> list[dict]:
     """Every complete variant's readout on one dataset; incomplete variants are reported."""
     import csv
@@ -140,6 +164,8 @@ def main():
         print(math.ceil(len(task_references(config, sys.argv[2])[0]) / dataset["chunk"]))
     elif command == "features":
         features(config, sys.argv[2], sys.argv[3], int(sys.argv[4]))
+    elif command == "reliability":
+        repeat_reliability(config, sys.argv[2], sys.argv[3])
     elif command == "readout":
         readout(config, sys.argv[2])
     elif command == "aggregate":
