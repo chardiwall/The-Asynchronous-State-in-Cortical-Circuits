@@ -25,27 +25,33 @@ def _read_csv(path: str) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-def plot_fig3a(raster_csv: str, tracking_csv: str, out_path: str) -> None:
+def plot_fig3a(raster_csv: str, tracking_csv: str, out_path: str, window_ms: float) -> None:
     """Raster of the rate-sorted neuron sample (top) over the z-scored population
-    activities that show E, I and X tracking one another (bottom).
+    activities that show E, I and X tracking one another (bottom), drawn over the first
+    `window_ms` of the run. The title's tracking correlations use the whole run.
     """
     raster = _read_csv(raster_csv)
-    tracking = _read_csv(tracking_csv)
+    full = _read_csv(tracking_csv)
+    series = {p: np.array([float(r[p]) for r in full]) for p in ("E", "I", "X")}
+    tracking_ei = np.corrcoef(series["E"], series["I"])[0, 1]
+    tracking_ex = np.corrcoef(series["E"], series["X"])[0, 1]
+    tracking = [r for r in full if float(r["t_ms"]) < window_ms]
 
     by_row = defaultdict(list)
     population_of = {}
-    for spike in raster:
+    for spike in raster:  # every sampled row is kept, even one silent inside the window
         row = int(spike["row"])
-        by_row[row].append(float(spike["t_ms"]))
         population_of[row] = spike["population"]
-    rows = sorted(by_row)
+        if float(spike["t_ms"]) < window_ms:
+            by_row[row].append(float(spike["t_ms"]))
+    rows = sorted(population_of)
 
     fig, axes = plt.subplots(2, 1, figsize=(8, 7), height_ratios=[3, 1], sharex=True)
     axes[0].eventplot([by_row[r] for r in rows],
                        colors=[GREEN if population_of[r] == "E" else RED for r in rows],
                        linelengths=0.9, linewidths=0.4)
     axes[0].set_ylabel("Neuron (sorted by rate)")
-    axes[0].set_title("Fig. 3A")
+    axes[0].set_title(f"Fig. 3A (zero-lag tracking over the run: E-I {tracking_ei:.2f}, E-X {tracking_ex:.2f})")
 
     t = [float(r["t_ms"]) for r in tracking]
     for population, color in (("E", GREEN), ("I", RED), ("X", BLUE)):
@@ -176,7 +182,8 @@ def main(config: dict) -> None:
     os.makedirs(panels_dir, exist_ok=True)
     plot_fig3a(output_path(config, "block3_fig3a_raster_csv"),
                output_path(config, "block3_fig3a_tracking_csv"),
-               output_path(config, "block3_fig3a"))
+               output_path(config, "block3_fig3a"),
+               config["spiking_network"]["fig3a"]["display_window_ms"])
     plot_fig3b(output_path(config, "block3_fig3b_correlations_csv"),
                output_path(config, "block3_fig3b"))
     plot_fig3c(output_path(config, "block3_vm_ccg_csv"), output_path(config, "block3_fig3c"))

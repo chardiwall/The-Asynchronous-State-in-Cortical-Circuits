@@ -319,6 +319,8 @@ spiking_network:
       # or 500 of each. Read here as 500 TOTAL, sampled from E and I in proportion to
       # their population sizes (so 400 E / 100 I at the paper's 4:1 ratio).
     tracking_bin_ms: 3.0        # "transformed to z scores, bin size 3 ms"
+    display_window_ms: 1000.0   # NOT stated: a display choice -- how much of the run the
+      # plotted panel shows. The data cover the whole run; only the drawing is cropped.
   fig3b:                        # Fig. 3B caption + Fig. S6
     jitter_ms: 500.0            # "jitter +/- 500 ms"; Fig. S6 states the distribution:
       # "uniform random shift in [-0.5, +0.5] s per spike". Count window T comes from
