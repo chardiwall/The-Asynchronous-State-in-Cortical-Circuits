@@ -12,14 +12,16 @@ V_rev^X=V_rev^E classifies X as excitatory-type (an ambiguity in SOM S-p.20-21).
 EE and II synapses exclude self-connections (i==j), matching block 2's binary-network
 convention for within-population pairs -- a neuron does not synapse onto itself.
 
-Integration-order caveat (verified against Brian2 2.10.1's scheduler, not assumed): the
-paper specifies second-order Runge-Kutta, and method="rk2" is what every group here asks
-for, but Brian2's (summed) mechanism runs the summed-variable updaters at order-1 and the
-neuron's state updater at order 0 within each timestep. So I_E/I_I/I_X are computed from
-the START-of-step V and then held constant across the step: rk2 applies to the leak plus
-those frozen currents, while the conductance term -g*s*(V - V_rev) is effectively Euler.
-This is inherent to (summed), not a choice made here, and at dt=0.05ms against tau_r=1ms
-it is the dominant discretisation error.
+The synaptic kinetics live on the POSTSYNAPTIC neuron, one (s_c, x_c) pair per input channel
+c in {E, I, X}, rather than on each of the ~9M synapses. This is exact, not an approximation:
+the SOM's per-synapse equations are linear and tau_r, tau_d and V_rev depend only on the
+presynaptic type, so S_c = sum_j g_ij s_ij obeys the same two ODEs driven by
+tau_tilde * sum_j g_ij delta(t - t_j - d_ij). Each synapse keeps its own g_ij and delay d_ij;
+on a spike it adds g_ij * tau_tilde/tau_r to x_c of its target. Integrating 5000 neurons
+instead of 9M synapses per step is what makes the paper's run lengths reachable (~27 h per
+200 s before). Side effect: the conductance term is now inside the neuron's rk2 step with V,
+so the earlier caveat that Brian2's (summed) variables froze I_E/I_I/I_X across each step
+(an effectively-Euler conductance term) no longer applies.
 """
 from dataclasses import dataclass
 
@@ -34,9 +36,15 @@ from block3.connectivity import (
 
 NEURON_EQS = """
 dV/dt = (-g_L*(V - V_L) + I_E + I_I + I_X + I_app) / C_m : volt (unless refractory)
-I_E : amp
-I_I : amp
-I_X : amp
+I_E = -s_E * (V - V_rev_E) : amp
+I_I = -s_I * (V - V_rev_I) : amp
+I_X = -s_X * (V - V_rev_E) : amp
+ds_E/dt = (x_E - s_E) / tau_d : siemens
+dx_E/dt = -x_E / tau_r : siemens
+ds_I/dt = (x_I - s_I) / tau_d : siemens
+dx_I/dt = -x_I / tau_r : siemens
+ds_X/dt = (x_X - s_X) / tau_d : siemens
+dx_X/dt = -x_X / tau_r : siemens
 I_app : amp
 theta : volt (constant)
 """
@@ -47,28 +55,22 @@ class Block3Network:
     network: b2.Network
     group_e: b2.NeuronGroup
     group_i: b2.NeuronGroup
-    group_x: b2.PoissonGroup
+    group_x: b2.Group  # PoissonGroup, or SpikeGeneratorGroup for explicit input events
     synapses: dict
     spikes_e: b2.SpikeMonitor
     spikes_i: b2.SpikeMonitor
     spikes_x: b2.SpikeMonitor
 
 
-def _build_synapse(source, target, post_current_name, v_rev_mV, mean_g_nS, std_fraction,
-                    delay_range_ms, tau_r, tau_d, tau_tilde, p, rng, name, exclude_self):
-    V_rev = v_rev_mV * b2.mV
-    eqs = f"""
-    ds/dt = (x - s) / tau_d : 1 (clock-driven)
-    dx/dt = -x / tau_r : 1 (clock-driven)
-    g_syn : siemens
-    {post_current_name}_post = -g_syn * s * (V_post - V_rev) : amp (summed)
-    """
+def _build_synapse(source, target, channel, mean_g_nS, std_fraction, delay_range_ms,
+                   tau_r, tau_tilde, p, rng, name, exclude_self):
     # Explicit namespace, not Brian2's implicit frame-capture default: build_network()
     # constructs objects but a caller elsewhere calls .run() on the returned Network, in a
-    # different frame -- implicit capture would look for tau_r/tau_d/... there and fail.
-    namespace = {"tau_r": tau_r, "tau_d": tau_d, "tau_tilde": tau_tilde, "V_rev": V_rev}
-    synapse = b2.Synapses(source, target, eqs, on_pre="x += tau_tilde / tau_r",
-                           namespace=namespace, method="rk2", name=f"synapses_{name}")
+    # different frame -- implicit capture would look for tau_r/tau_tilde there and fail.
+    synapse = b2.Synapses(source, target, "g_syn : siemens",
+                          on_pre=f"x_{channel}_post += g_syn * tau_tilde / tau_r",
+                          namespace={"tau_r": tau_r, "tau_tilde": tau_tilde},
+                          name=f"synapses_{name}")
 
     # Connectivity generated in numpy before connect() is called, not via Brian2's own
     # connect(p=...) + reading len(synapse) back afterwards -- required for cpp_standalone
@@ -111,7 +113,18 @@ def build_network(params: dict, rng: np.random.Generator) -> Block3Network:
     # the spiking mechanism in the recorded pair (S-p.21) by raising only those cells'
     # threshold out of reach. Every neuron is set to the config value below, so a normal
     # run is numerically identical to a single shared threshold.
-    neuron_namespace = {"g_L": g_L, "C_m": C_m, "V_L": V_L, "v_reset": v_reset}
+    rev = params["reversal_potentials_mV"]
+    cond = params["conductances_nS"]
+    syn = params["synapse"]
+    delays = params["delays_ms"]
+    tau_r = syn["tau_rise_ms"] * b2.ms
+    tau_d = syn["tau_decay_ms"] * b2.ms
+    tau_tilde = syn["tau_normalisation_ms"] * b2.ms
+    std_fraction = cond["heterogeneity_std_fraction"]
+
+    neuron_namespace = {"g_L": g_L, "C_m": C_m, "V_L": V_L, "v_reset": v_reset,
+                        "tau_r": tau_r, "tau_d": tau_d,
+                        "V_rev_E": rev["excitatory"] * b2.mV, "V_rev_I": rev["inhibitory"] * b2.mV}
     group_e = b2.NeuronGroup(n_e, NEURON_EQS, threshold="V>theta", reset="V=v_reset",
                               refractory=t_ref_e, namespace=neuron_namespace,
                               method="rk2", name="group_e")
@@ -123,32 +136,29 @@ def build_network(params: dict, rng: np.random.Generator) -> Block3Network:
         group.I_app = 0 * b2.nA
         group.theta = theta
 
-    group_x = b2.PoissonGroup(
-        n_x, rates=params["external_input"]["rate_hz"] * b2.Hz, name="group_x"
-    )
+    external = params["external_input"]
+    if external["kind"] == "spike_generator":
+        # Explicit input events (a test's single spike, or an event-camera stream), in
+        # place of the SOM's background Poisson trains.
+        group_x = b2.SpikeGeneratorGroup(n_x, external["indices"],
+                                         np.asarray(external["times_ms"]) * b2.ms,
+                                         name="group_x")
+    else:
+        group_x = b2.PoissonGroup(n_x, rates=external["rate_hz"] * b2.Hz, name="group_x")
 
-    rev = params["reversal_potentials_mV"]
-    cond = params["conductances_nS"]
-    syn = params["synapse"]
-    delays = params["delays_ms"]
-    tau_r = syn["tau_rise_ms"] * b2.ms
-    tau_d = syn["tau_decay_ms"] * b2.ms
-    tau_tilde = syn["tau_normalisation_ms"] * b2.ms
-    std_fraction = cond["heterogeneity_std_fraction"]
-
-    # (source, target, postsynaptic current name, reversal potential, mean g, delay range, exclude self)
+    # (source, target, postsynaptic input channel, mean g, delay range, exclude self)
     specs = {
-        "EE": (group_e, group_e, "I_E", rev["excitatory"], cond["g_EE"], delays["from_excitatory"], True),
-        "IE": (group_e, group_i, "I_E", rev["excitatory"], cond["g_IE"], delays["from_excitatory"], False),
-        "EI": (group_i, group_e, "I_I", rev["inhibitory"], cond["g_EI"], delays["from_inhibitory"], False),
-        "II": (group_i, group_i, "I_I", rev["inhibitory"], cond["g_II"], delays["from_inhibitory"], True),
-        "EX": (group_x, group_e, "I_X", rev["excitatory"], cond["g_EX"], delays["from_excitatory"], False),
-        "IX": (group_x, group_i, "I_X", rev["excitatory"], cond["g_IX"], delays["from_excitatory"], False),
+        "EE": (group_e, group_e, "E", cond["g_EE"], delays["from_excitatory"], True),
+        "IE": (group_e, group_i, "E", cond["g_IE"], delays["from_excitatory"], False),
+        "EI": (group_i, group_e, "I", cond["g_EI"], delays["from_inhibitory"], False),
+        "II": (group_i, group_i, "I", cond["g_II"], delays["from_inhibitory"], True),
+        "EX": (group_x, group_e, "X", cond["g_EX"], delays["from_excitatory"], False),
+        "IX": (group_x, group_i, "X", cond["g_IX"], delays["from_excitatory"], False),
     }
     synapses = {
-        name: _build_synapse(source, target, post_name, v_rev, mean_g, std_fraction,
-                              delay_range, tau_r, tau_d, tau_tilde, p, rng, name, exclude_self)
-        for name, (source, target, post_name, v_rev, mean_g, delay_range, exclude_self) in specs.items()
+        name: _build_synapse(source, target, channel, mean_g, std_fraction, delay_range,
+                             tau_r, tau_tilde, p, rng, name, exclude_self)
+        for name, (source, target, channel, mean_g, delay_range, exclude_self) in specs.items()
     }
 
     spikes_e = b2.SpikeMonitor(group_e, name="spikes_e")
