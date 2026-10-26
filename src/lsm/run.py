@@ -103,7 +103,7 @@ def readout(config: dict, name: str) -> list[dict]:
         with open(path) as f:
             old = [r for r in csv.DictReader(f) if r["dataset"] != name]
     with open(path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["dataset", "variant", "C", "validation_accuracy", "train_accuracy",
+        writer = csv.DictWriter(f, fieldnames=["dataset", "variant", "C", "validation_accuracy", "participation_ratio", "train_accuracy",
                                                "test_accuracy", "n_train", "n_test", "n_features"])
         writer.writeheader()
         writer.writerows(old + rows)

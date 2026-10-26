@@ -32,3 +32,13 @@ def test_regularisation_is_chosen_on_a_validation_split_of_the_training_data():
                             validation_fraction=0.25, rng=rng)
     assert score["C"] == 1.0                  # 1e-4 under-fits a clean linear problem
     assert score["test_accuracy"] > 0.9
+
+
+def test_participation_ratio_counts_effective_dimensions():
+    from lsm.readout import participation_ratio
+
+    rng = np.random.default_rng(2)
+    isotropic = rng.normal(size=(20000, 10))
+    assert abs(participation_ratio(isotropic) - 10) < 0.3
+    rank_one = np.outer(rng.normal(size=5000), rng.normal(size=8))
+    assert abs(participation_ratio(rank_one) - 1) < 1e-6

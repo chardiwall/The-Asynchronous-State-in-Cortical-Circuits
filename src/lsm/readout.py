@@ -6,6 +6,17 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 
+def participation_ratio(x) -> float:
+    """(sum lambda)^2 / sum lambda^2 over the covariance eigenvalues of x's columns: the
+    effective number of dimensions the liquid state occupies (d if isotropic, 1 if rank 1).
+    Computed from the Gram matrix of the centred samples, which has the same non-zero
+    eigenvalues as the covariance and is cheaper when samples < features."""
+    centred = np.asarray(x, dtype=np.float64) - np.mean(x, axis=0)
+    small = centred @ centred.T if centred.shape[0] < centred.shape[1] else centred.T @ centred
+    eigenvalues = np.clip(np.linalg.eigvalsh(small), 0.0, None)
+    return float(eigenvalues.sum() ** 2 / (eigenvalues ** 2).sum())
+
+
 def _fit(x, y, c, max_iter):
     scaler = StandardScaler().fit(x)
     return scaler, LogisticRegression(C=c, max_iter=max_iter).fit(scaler.transform(x), y)
@@ -25,6 +36,7 @@ def train_and_score(train_x, train_y, test_x, test_y, c, max_iter: int,
     best = max(validation, key=validation.get) if validation else float(grid[0])
     scaler, model = _fit(train_x, train_y, best, max_iter)
     return {"C": best, "validation_accuracy": validation.get(best, float("nan")),
+            "participation_ratio": participation_ratio(scaler.transform(train_x)),
             "train_accuracy": float(model.score(scaler.transform(train_x), train_y)),
             "test_accuracy": float(model.score(scaler.transform(test_x), test_y)),
             "n_train": int(len(train_y)), "n_test": int(len(test_y)), "n_features": int(train_x.shape[1])}
