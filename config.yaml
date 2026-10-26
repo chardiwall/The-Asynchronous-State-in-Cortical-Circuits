@@ -189,8 +189,12 @@ binary_network:
     # memory per worker (OOM at N=8192) and misbehaved on ARM64, so each task is its own
     # OS process.
     sizes:   [100, 178, 316, 562, 1000, 1780, 3160, 5620, 8192]
-    repeats: [50,  50,  50,  50,  50,   50,   25,   12,   10]
-    length_tau: 200000
+    repeats: [20,  20,  20,  20,  20,   20,   10,    6,    5]
+    length_tau: 40000          # REDUCED PASS (2026-10-26, for a deadline): the paper's
+      # protocol is 200000 tau with 50 repeats per size, which costs ~16-24 h per N=8192
+      # realisation here. 40000 tau and the repeats above cost ~70 core-hours for both
+      # sweeps. Every N is kept; each dot's noise floor is ~sqrt(5) wider than the paper's.
+      # Restore repeats [50,50,50,50,50,50,25,12,10] and 200000 for the full protocol.
   fig2g_subsample_neurons: 1000  # random E-neuron subset at N=8192 for the r histogram (~500k pairs)
   ccg:
     max_lag_ms: 50.0            # lag range COMPUTED; bin = tau_ms / sampling_rate_lagged
@@ -279,24 +283,20 @@ spiking_network:
     length_s: 200.0            # 5000 s for the Fig. S6 characterisation run
     n_networks: 10
   panels:                       # Fig. 3A/3B's single-network run (block3.run panels)
-    length_s: 1000.0            # DELIBERATE DEVIATION from the paper, decided 2026-10-01.
-      # Fig. S6 states 5000 s for the single-network protocol ("All data comes from a single
-      # network simulated for 5000 s. All parameters as in Fig. 3 of the main text");
-      # Fig. 3's own caption states no length. 5000 s is not reachable here: at the measured
-      # 27.1 h per 200 s on this node it is ~677 h (~28 days) uncheckpointed, with a 40GB
-      # rate matrix. 1000 s costs ~135 h and 8GB.
+    length_s: 2000.0            # DELIBERATE DEVIATION from the paper's 5000 s (Fig. S6:
+      # "All data comes from a single network simulated for 5000 s"; Fig. 3's own caption
+      # states no length). Since the per-neuron synaptic integration (2026-10-26) the
+      # simulation itself is no longer the limit -- ~6 s wall per simulated second -- the
+      # Fig. 3B rate matrix is: (r_bar_sample_size, n_windows) float64 is 16GB at 2000 s
+      # and 40GB at 5000 s, and numpy.corrcoef adds a centred copy on top.
       #
       # What it costs scientifically, measured not guessed. Fig. 3B's claim is that the
       # measured histogram is wide RELATIVE to its jittered null, and the null's width is
       # pure estimator noise -- sigma_r for independent 1 Hz trains at T=50 ms is
-      #     200 s -> 0.0114     1000 s -> 0.0056     5000 s -> 0.0027
-      # on an axis spanning +-0.05. At 200 s the null is as wide as the measurement and the
-      # panel says nothing; at 1000 s it is half that, so the comparison is real but the
-      # separation is visibly weaker than the published figure's. r_bar itself averages over
-      # ~500k pairs and is unaffected at any of these lengths; only sigma_r is.
-      #
-      # Raise this to 5000 and the guard below will refuse -- by design. See GitHub #8.
-    max_rate_matrix_gb: 10.0    # NOT a paper value -- a guard, sized against block3_panels.slurm's
+      #     200 s -> 0.0114     1000 s -> 0.0056     2000 s -> ~0.004     5000 s -> 0.0027
+      # on an axis spanning +-0.05. r_bar itself averages over ~500k pairs and is
+      # unaffected at any of these lengths; only sigma_r is. See GitHub #8.
+    max_rate_matrix_gb: 20.0    # NOT a paper value -- a guard, sized against block3_panels.slurm's
       # --mem. block3.measure.pairwise_correlations stacks an (r_bar_sample_size, n_windows) float64
       # matrix, n*(length_s*1000 - burn_in_ms)/bin_dt_ms*8 bytes: 1.6GB at 200 s, 8GB at
       # 1000 s, 40GB at 5000 s, and numpy.corrcoef adds a centred copy on top.

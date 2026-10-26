@@ -15,12 +15,11 @@
 # without a check).
 #SBATCH --job-name=block3_full_pass
 #SBATCH --partition=gpu
-#SBATCH --nodelist=spark-c3d8
 #SBATCH --array=0-9
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=6G
-#SBATCH --time=72:00:00
+#SBATCH --time=06:00:00
 #SBATCH --output=artifacts/block3_full_pass/slurm_%a.out
 #SBATCH --container-image=ubuntu:24.04
 #SBATCH --container-remap-root

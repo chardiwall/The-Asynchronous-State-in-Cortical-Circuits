@@ -16,11 +16,10 @@
 #   sbatch --array=337-346%13 --mem=9G slurm/block2_sweep.slurm  # N=8192
 #SBATCH --job-name=block2_full_pass
 #SBATCH --partition=gpu
-#SBATCH --nodelist=spark-c3d8
-#SBATCH --array=0-346%20
+#SBATCH --array=0-140%20
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --time=20:00:00
+#SBATCH --time=08:00:00
 #SBATCH --output=artifacts/block2_full_pass/slurm_%a.out
 
 cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits

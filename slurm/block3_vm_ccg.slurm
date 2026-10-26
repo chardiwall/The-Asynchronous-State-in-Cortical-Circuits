@@ -15,12 +15,11 @@
 #   sbatch slurm/block3_vm_ccg.slurm
 #SBATCH --job-name=block3_vm_ccg
 #SBATCH --partition=gpu
-#SBATCH --nodelist=spark-c3d8
-#SBATCH --array=0-89%6
+#SBATCH --array=0-89%16
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=6G
-#SBATCH --time=24:00:00
+#SBATCH --time=04:00:00
 #SBATCH --output=artifacts/block3_vm_ccg/slurm_%a.out
 #SBATCH --container-image=ubuntu:24.04
 #SBATCH --container-remap-root
