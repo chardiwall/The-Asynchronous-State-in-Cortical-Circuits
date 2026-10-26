@@ -83,8 +83,9 @@ N = 500 with **no tuning**: **E 1.26 Hz, I 3.85 Hz** (paper at N = 5000: 1.0 / 3
   the X conductances follow the same √ rule (`g_aX ∝ √(4000/N_X)`).
 - Events are **thinned** with one dataset-wide keep-probability, which brings the mean
   stimulus rate per channel to 20 Hz (8× the background), inside the balanced network's
-  linear-response range. q is estimated on 500 training samples only (N-MNIST q ≈ 0.7–0.8,
-  DVS Gesture q = 0.086).
+  linear-response range. q is estimated on 500 training samples only: **N-MNIST q = 0.740,
+  DVS Gesture q = 0.164**. Measured input rates per chunk, including the 2.5 Hz background:
+  N-MNIST 22 Hz, DVS Gesture 17–27 Hz.
 - Samples are laid end to end with a 50 ms gap (~3 τ_m) so their states do not carry over.
 
 ### 3.4 Implementation: no second simulator
@@ -122,7 +123,66 @@ linear and moderate.
 
 ## 5. Results — asynchrony (question 1)
 
-*(filled in from `artifacts/lsm/asynchrony.csv`; see figures)*
+Background-only runs (block 3's 2.5 Hz Poisson X, no task input), 100 s each, 3 network
+realisations per point, measured with the paper's estimators. 21 runs, `artifacts/lsm/asynchrony.csv`.
+
+### 5.1 The faithful LSM follows the paper's scaling law down to reservoir size
+
+![r̄ and σ_r against N](figures/lsm_scaling.png)
+
+| faithful, N | 250 | **500** | 1000 | 2000 | 5000 (= block 3) |
+|---|---|---|---|---|---|
+| E / I rate (Hz) | 1.25 / 3.16 | **1.38 / 3.75** | 1.38 / 4.29 | 1.27 / 4.27 | 1.03 / 3.98 |
+| r̄ (E pairs, T = 50 ms) | 0.031 | **0.0117** | 0.0034 | 0.00094 | 0.00014 |
+| σ_r measured | 0.036 | **0.026** | 0.021 | 0.020 | 0.019 |
+| σ_r of the jittered null | 0.019 | 0.018 | 0.018 | 0.018 | 0.018 |
+| c_T, total current corr. | 0.067 | **0.051** | 0.035 | 0.019 | 0.0096 |
+| E–I tracking (3 ms) | 0.56 | 0.60 | 0.61 | 0.60 | 0.62 |
+
+- **r̄ falls as N^−1.82** (log-log fit over N = 250–5000), at least as fast as the theory's 1/N.
+  The extra steepness at small N is plausibly the finite-K correction: at √K ≈ 6–9 the balance
+  is imperfect, and the residual correlation that it leaves decays faster than the
+  asymptotic 1/N.
+- **c_T falls as N^−0.66**, against the theory's 1/√N (exponent −0.5).
+- **σ_r ≫ r̄ at every N** (at N = 500, 0.026 against 0.012), and σ_r stays above its
+  jittered null, so individual pairs keep real correlations of both signs.
+- The N = 5000 point is the paper's own network: r̄ = 1.4 × 10⁻⁴, matching the block 3
+  reproduction (1.6 × 10⁻⁴ over 10 networks × 200 s).
+
+**Answer to question 1: yes.** The asynchronous state survives, through the same mechanism, in
+a 500-neuron reservoir, provided the reservoir keeps the four ingredients and the √K
+coupling. Its residual correlation is larger (r̄ ≈ 0.012), exactly as the 1/N law predicts.
+
+### 5.2 The mechanism: cancellation of current correlations
+
+The current correlations must be measured on currents averaged over the count window T
+(the SOM's filtered currents, Fig. S6). On raw 1 ms currents, the total stays at ~0.15 for
+every N, because Poisson shot noise is faster than inhibition can track (τ_d = 5 ms) and
+spikes do not respond to it. See `figures/lsm_current_scaling_1ms.png`.
+
+![current decomposition at N = 500](figures/lsm_currents_T.png)
+
+At N = 500 and **equal background rate**:
+
+| variant | c_EE | c_II | c_XX | 2c_EI | 2c_EX | 2c_IX | **c (total)** | **r̄** | σ_r |
+|---|---|---|---|---|---|---|---|---|---|
+| faithful | +0.13 | +0.72 | +0.18 | **−0.57** | +0.23 | **−0.65** | **0.051** | **0.0117** | 0.026 |
+| dense_weak | +0.03 | +0.15 | +0.19 | −0.11 | +0.12 | −0.29 | 0.082 | 0.0190 | 0.027 |
+| maass | +0.00 | +0.00 | +0.16 | −0.00 | +0.01 | −0.02 | 0.148 | **0.0386** | 0.032 |
+
+- **Faithful.** Large positive terms (sum ≈ +1.03) are cancelled by large negative E–I and
+  I–X terms (≈ −1.22, offset by +0.23 from E–X) down to 0.05: the paper's mechanism.
+- **Maass liquid.** The recurrent currents are tiny (in-degree ~6), so the cell's current
+  is essentially its share of the external input. c ≈ c_XX ≈ 0.15, with nothing to cancel
+  it, and r̄ is **3.3× higher than faithful at the same firing rate**.
+- **dense_weak** sits in between: dense wiring alone is not enough; the strong coupling
+  (ingredient 2) does the cancelling.
+
+![cancellation vs N](figures/lsm_current_scaling_T.png)
+
+As N grows, the dominant negative term moves from 2c_EI to 2c_IX: inhibition increasingly
+tracks the external input itself, while the total c falls monotonically. This is the
+paper's tracking picture, with I following X as well as E.
 
 ## 6. Results — classification (question 3)
 

@@ -89,7 +89,7 @@ def plot_currents(rows, size, out_path, suffix=""):
 
 
 def plot_current_scaling(rows, out_path, suffix=""):
-    fig, ax = plt.subplots(figsize=(5, 4))
+    fig, ax = plt.subplots(figsize=(6.5, 4))
     for key, label, colour in CURRENT_TERMS:
         n, m, s = _stats(rows, "faithful", key + suffix)
         factor = 2 if label.startswith("2") else 1
@@ -97,8 +97,8 @@ def plot_current_scaling(rows, out_path, suffix=""):
                     ms=6, capsize=2, label=label)
     ax.axhline(0, color=BLACK, lw=0.6)
     ax.set(xscale="log", xlabel="N (recurrent neurons)", ylabel="current-correlation term",
-           title="Faithful LSM: cancellation vs N" + (" (currents averaged over T)" if suffix else " (1 ms currents)"))
-    ax.legend(frameon=False, fontsize=7, ncol=2)
+           title="Faithful LSM: cancellation vs N\n" + ("(currents averaged over T = 50 ms)" if suffix else "(1 ms currents)"))
+    ax.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(1.0, 1.0))
     _style(ax, n)
     fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
 
