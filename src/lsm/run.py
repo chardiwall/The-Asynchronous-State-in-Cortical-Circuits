@@ -160,6 +160,10 @@ def main():
                                 output_path(config, "lsm_asynchrony_csv"), ASYNCHRONY_FIELDS,
                                 lambda r: (r["variant"], r["n"], r["network_index"]))
         print(f"{n} asynchrony rows")
+    elif command == "plot":
+        from lsm import plot
+
+        plot.main(config)
     else:
         raise SystemExit(f"unknown command {command!r}")
 

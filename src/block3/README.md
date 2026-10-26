@@ -29,23 +29,25 @@ These are recorded here because they are inferences, not transcriptions.
    × 10 networks = 1000. No other simple scheme gives both. If you
    reject it, only `fig3cd.n_recorded_cells_per_condition` and the pair enumeration change.
 
-3. **Fig. 3B runs at 1000 s, not the 5000 s the supplement states.** A deliberate,
-   documented deviation (decided 2026-10-01, GitHub issue #8). The panel's claim is that the
+3. **Fig. 3B runs at 2000 s, not the 5000 s the supplement states.** A deliberate,
+   documented deviation (decided 2026-10-01 at 1000 s, GitHub issue #8; raised to 2000 s on
+   2026-10-26 once the simulation stopped being the bottleneck). The panel's claim is that the
    measured histogram is wide *relative to its jittered null*, and the null's width is pure
    estimator noise. Measured, for independent 1 Hz trains at the stated count window:
 
-   | run length | null width | rate matrix | wall clock |
+   | run length | null width | rate matrix | wall clock (per-neuron synapses) |
    |---|---|---|---|
-   | 200 s | 0.0114 | 1.6 GB | 27 h |
-   | **1000 s (configured)** | **0.0056** | **8 GB** | **135 h** |
-   | 5000 s (the supplement's) | 0.0027 | 40 GB | ~28 days |
+   | 200 s | 0.0114 | 1.6 GB | 12 min |
+   | 1000 s | 0.0056 | 8 GB | ~1 h |
+   | **2000 s (configured)** | **~0.004** | **16 GB** | **~2–3 h** |
+   | 5000 s (the supplement's) | 0.0027 | 40 GB | ~6 h |
 
    On an axis spanning ±0.05, the 200 s null is as wide as the measurement and the panel
-   says nothing. At 1000 s the comparison is real, but the separation is visibly weaker than
-   the published figure's. The population-averaged correlation itself averages over ~500k
+   says nothing. At 2000 s the comparison is real; it is still weaker than the published
+   figure's 5000 s, and the limit is now the rate matrix's memory, not the simulation. The population-averaged correlation itself averages over ~500k
    pairs and is unaffected at any of these lengths; only the spread is.
 
-   Raising `panels.length_s` back to 5000 makes `block3.run panels` refuse before building
+   Raising `panels.length_s` to 5000 without raising `max_rate_matrix_gb` makes `block3.run panels` refuse before building
    the network (the guard is `figures_ab.check_rate_matrix_fits`), by design, rather than
    fail after days with nothing written.
 
@@ -59,7 +61,7 @@ level to a curve. `fig3cd.epsp_condition_nA` and `ipsp_condition_nA` hold that r
 From the **repo root** with `PYTHONPATH=src`. This network has about 9 million synapses, so
 only the smoke test is local.
 
-### Step 0 — smoke test (local, about 25 minutes)
+### Step 0 — smoke test (local, under a minute)
 
 ```bash
 PYTHONPATH=src .env/bin/python -m block3.run networks 0 --seconds 5
@@ -87,8 +89,8 @@ Writes `artifacts/block3_full_pass.csv`: per-network E and I rates and `r̄`.
 sbatch slurm/block3_panels.slurm
 ```
 
-One network, one run, both panels, at `panels.length_s` (5000 s — see item 3 above; this is
-the single most expensive job in the repo). Writes `fig3a_raster.csv`, `fig3a_tracking.csv`
+One network, one run, both panels, at `panels.length_s` (2000 s — see item 3 above; this is
+the single most expensive job in the repo, bounded by its 16 GB rate matrix). Writes `fig3a_raster.csv`, `fig3a_tracking.csv`
 and `fig3b_correlations.csv` to `artifacts/block3_panels/`. Locally with a short window:
 `PYTHONPATH=src .env/bin/python -m block3.run panels --seconds 5`
 
@@ -158,25 +160,23 @@ Brian2's runtime mode needs its Cython headers, which this cluster lacks and the
 `python3.12-dev` per task. Without it Brian2 silently falls back to pure-Python codegen,
 which measured **29× slower** and makes the full pass infeasible.
 
-Measured reference on this node: 200 s of simulated time cost **27h07m** wall and **3.85GB**
-peak RSS. A 200 ms benchmark had extrapolated 67 h, overestimating by about 2.5×, because
-per-timestep fixed overhead amortises far better over a long run. Size new jobs from the
-27-hour figure, and confirm with the `/usr/bin/time -v` log each task writes.
+**Synapses are integrated per neuron, not per synapse** (since 2026-10-26). The SOM's
+difference-of-exponentials synapse is linear and its time constants and reversal potential
+depend only on the presynaptic type, so each neuron's summed conductance per input channel
+obeys the same two ODEs as one synapse, driven by `τ̃ Σ_j g_ij δ(t − t_j − d_ij)`. This is
+exact; `tests/block3/test_model_kernel.py` pins it against the closed-form kernel at 1% of
+peak. Each synapse keeps its own `g_ij` and delay.
 
-One cost in that figure is **unmeasured**: `measure.pairwise_correlations` builds a
-`(1000, ~49,950)` float64 rate matrix (~400 MB) and hands it to `numpy.corrcoef`, which
-allocates a centred copy plus the Gram matrix. The 3.85 GB run predates that step, so
-measure peak RSS once before sizing `--mem` rather than repeating this project's history of
-OOM kills from unvalidated estimates.
-
-`cpp_standalone` was benchmarked and gave **no speedup** (possibly a regression, not root
-caused). Do not reach for it without re-measuring.
+Measured on this cluster: **200 s of simulated time costs 11 min 44 s wall and 3.76 GB peak
+RSS** (`/usr/bin/time -v`), including the `r̄` step. The per-synapse formulation it replaced
+cost **27 h 07 min** for the same run, so every protocol in the paper is now reachable,
+including Fig. 3C–D's 90 × 50 s in well under an hour of array time.
 
 ## Module map
 
 | File | Role |
 |---|---|
-| `model.py` | The Brian2 network: E/I `NeuronGroup`s, X `PoissonGroup`, six `Synapses`. `theta` is per-neuron so Fig. 3C-D can disable spiking in the recorded cells |
+| `model.py` | The Brian2 network: E/I `NeuronGroup`s carrying the per-channel synaptic kinetics, X as a `PoissonGroup` (or `SpikeGeneratorGroup` for explicit input events), six `Synapses`. `theta` is per-neuron so Fig. 3C-D can disable spiking in the recorded cells |
 | `connectivity.py` | Per-synapse conductance heterogeneity and delays, plus the Bernoulli draw |
 | `measure.py` | This block's analysis: rates, spike times, subsampling, the pairwise-correlation vector and its mean, plus Fig. 3C-D's pair enumeration and CCG peak |
 | `figures_ab.py` | What one network run records for Fig. 3A and 3B |
@@ -197,12 +197,11 @@ Machinery lives in `src/lib` (`tasks`, `plotting`); cluster scripts live in `slu
    cells" and "from inhibitory cells".
 4. **Fig. 3A's "500 E and I neurons" is read as 500 total**, split between E and I in
    proportion to population size. The caption does not say whether it means 500 of each.
-5. **The synaptic drive is first-order in time, despite `rk2`.** The paper specifies
-   second-order Runge-Kutta and every group here requests it, but Brian2's `(summed)`
-   mechanism computes `I_E`/`I_I`/`I_X` from the start-of-step `V` and holds them constant
-   across the step. So `rk2` applies to the leak plus those frozen currents while the
-   conductance term is effectively Euler. This is inherent to `(summed)`, not a choice, and
-   at `dt = 0.05 ms` against `τ_r = 1 ms` it is the dominant discretisation error.
+5. **Spike delivery lags the continuous kernel by one step.** Brian2 applies a spike's
+   effect in the `synapses` slot, after that step's state update, so every conductance
+   starts one `dt = 0.05 ms` late against the 0.5–1.5 ms delays. (The earlier caveat — that
+   `(summed)` variables froze the conductance term into Euler — is gone: the conductances
+   now sit inside the neuron's `rk2` step with `V`.)
 6. **The membrane-potential CCG is a Pearson correlation coefficient**, sampled at 1 ms.
    The SOM says only "we computed cross-correlograms of the voltages" and gives no formula
    or bin; S-Eq(42)'s spike-train normalisation by `ν_i ν_j` has no meaning for a voltage.
