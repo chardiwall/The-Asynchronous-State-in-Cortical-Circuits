@@ -10,15 +10,16 @@
 #SBATCH --mem=6G
 #SBATCH --time=03:00:00
 #SBATCH --output=artifacts/lsm/asynchrony/slurm_%a.out
-#SBATCH --container-image=ubuntu:24.04
+#SBATCH --container-image=/home/chardiwall/.local/share/asyncstate-py312.sqsh
 #SBATCH --container-remap-root
 #SBATCH --container-mount-home
 #SBATCH --container-writable
 
 set -e
-# Skipped when the image already has the headers. Submit with a prebuilt image to avoid
-# Docker Hub's pull rate limit (HTTP 429 when ~100 array tasks start at once):
-#   sbatch --container-image=$HOME/.local/share/asyncstate-py312.sqsh <script>
+# The image is ubuntu:24.04 plus python3.12-dev/build-essential, saved once with
+#   srun --container-image=ubuntu:24.04 --container-save=<that path> ... apt-get install ...
+# so array tasks never pull from Docker Hub (~100 tasks at once hit its HTTP 429 limit).
+# With a plain ubuntu image instead, the install below runs per task.
 [ -f /usr/include/python3.12/Python.h ] || { apt-get update -qq && apt-get install -y -qq python3.12-dev python3 build-essential >/dev/null 2>&1; }
 
 cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits
