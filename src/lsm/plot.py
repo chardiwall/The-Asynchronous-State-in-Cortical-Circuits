@@ -12,6 +12,7 @@ from config import output_path
 from lib.plotting import BLACK, BLUE, GREEN, RED
 
 VARIANT_COLOUR = {"faithful": "#7b3294", "dense_weak": "#e08214", "maass": "#018571", "input": "#8c8c8c"}
+DATASET_LABEL = {"nmnist": "N-MNIST", "dvs_gesture": "DVS Gesture"}
 VARIANT_LABEL = {"faithful": "faithful (dense, √K-scaled)", "dense_weak": "dense, weak",
                  "maass": "Maass column", "input": "input only (no reservoir)"}
 
@@ -102,13 +103,18 @@ def plot_readout(rows, out_path):
     order = [v for v in ("input", "faithful", "dense_weak", "maass") if any(r["variant"] == v for r in rows)]
     fig, axes = plt.subplots(1, len(datasets), figsize=(4.5 * len(datasets), 3.8))
     for ax, d in zip(np.atleast_1d(axes), datasets):
-        acc = [next((100 * float(r["test_accuracy"]) for r in rows if r["dataset"] == d and r["variant"] == v), np.nan)
-               for v in order]
-        ax.bar(range(len(order)), acc, color=[VARIANT_COLOUR[v] for v in order], width=0.7, edgecolor="white")
-        for i, a in enumerate(acc):
-            ax.text(i, a + 0.5, f"{a:.1f}%", ha="center", va="bottom", fontsize=9)
+        found = [next((r for r in rows if r["dataset"] == d and r["variant"] == v), None) for v in order]
+        acc = np.array([100 * float(r["test_accuracy"]) if r else np.nan for r in found])
+        # 95% binomial interval of a test accuracy over n_test independent samples
+        ci = np.array([196 * np.sqrt(float(r["test_accuracy"]) * (1 - float(r["test_accuracy"])) / float(r["n_test"]))
+                       if r else np.nan for r in found])
+        ax.bar(range(len(order)), acc, yerr=ci, capsize=4, color=[VARIANT_COLOUR[v] for v in order],
+               width=0.7, edgecolor="white", error_kw={"lw": 1})
+        for i, (a, e) in enumerate(zip(acc, ci)):
+            ax.text(i, a + e + 0.5, f"{a:.1f}%", ha="center", va="bottom", fontsize=9)
         ax.set_xticks(range(len(order)), [VARIANT_LABEL[v].replace(" (", "\n(") for v in order], fontsize=7)
-        ax.set(ylabel="test accuracy (%)", ylim=(0, 105), title=d)
+        n_test = int(float(found[0]["n_test"])) if found[0] else 0
+        ax.set(ylabel="test accuracy (%)", ylim=(0, 108), title=f"{DATASET_LABEL.get(d, d)} (n_test = {n_test}, ±95% CI)")
         _style(ax)
     fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
 

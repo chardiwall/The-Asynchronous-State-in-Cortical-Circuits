@@ -44,15 +44,21 @@ them. Supplementary figures are out of scope.
 
 ## Status
 
-All three blocks are implemented and under test. Results are a separate matter: the large
-passes are multi-day cluster jobs, and `artifacts/` is not tracked, so **a fresh clone ships
-the code, not the figures.**
+All three blocks are implemented and under test. Results are a separate matter: `artifacts/`
+is not tracked, so **a fresh clone ships the code, not the figures**. The figures and numbers
+from the 2026-10-26 cluster pass are in [`reports/`](reports/):
 
 | Block | Implementation | Results produced here |
 |---|---|---|
 | 1 | complete | Fig. 1 B/C/E/F, at the paper's full `length_s = 10000` |
-| 2 | complete | Panels 2B/2D/2E/2G. Fig. 2C's two `N`-sweeps are long Slurm-array jobs, not yet run to completion |
-| 3 | complete | Exploratory pass only; the Fig. 3A–B and 3C–D full passes have not been run |
+| 2 | complete | Panels 2B/2D/2E/2G; Fig. 2C from a reduced sweep (40000 τ, ≤20 realisations per N) |
+| 3 | complete | Fig. 3A–B statistics (10 × 200 s, the paper's protocol), Fig. 3C–D (all 90 tasks), Fig. 3A/3B panels at 2000 s |
+
+- [`reports/renart2010_reproduction.md`](reports/renart2010_reproduction.md) — the
+  reproduction: every figure, the numbers against the paper's, and the deviations.
+- [`reports/lsm_technical.md`](reports/lsm_technical.md) — an extension beyond the paper
+  (`src/lsm/`): does the asynchronous state survive in a 500-neuron liquid state machine,
+  what a faithful LSM needs, and whether it classifies N-MNIST / DVS Gesture better.
 
 Each block's own README is the run guide: exact commands per panel, which `config.yaml` keys
 trade cost against accuracy, the paper's target result, and that block's known deviations
@@ -70,6 +76,8 @@ flagged at the top of [`src/block3/README.md`](src/block3/README.md).
 | `src/config.py` | The `config.yaml` loader and `output_path`, the one place output locations are resolved |
 | `src/lib/` | Machinery: Numba kernels, Brian2 batching, chunking, Slurm-array bookkeeping, plotting helpers |
 | `src/block1/`, `src/block2/`, `src/block3/` | One directory per figure, each with its own README |
+| `src/lsm/` | The liquid-state-machine extension (not in the paper): block 3's network at reservoir size, three variants, event-camera readout |
+| `reports/` | Results reports and their figures |
 | `slurm/` | Cluster job scripts, named by block and figure |
 | `tests/` | Tests, written before the code they cover |
 | `artifacts/` | Metrics, logs and figures (generated; not tracked) |
