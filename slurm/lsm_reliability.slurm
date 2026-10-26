@@ -23,4 +23,4 @@ set -e
 [ -f /usr/include/python3.12/Python.h ] || { apt-get update -qq && apt-get install -y -qq python3.12-dev python3 build-essential >/dev/null 2>&1; }
 
 cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits
-PYTHONPATH=src .env/bin/python -m lsm.run reliability "$1" "$2"
+PYTHONPATH=src .env/bin/python -m lsm.run reliability "$1" "$2" ${3:+--size $3}

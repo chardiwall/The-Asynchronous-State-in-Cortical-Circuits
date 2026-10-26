@@ -3,6 +3,7 @@
 #   n=$(PYTHONPATH=src .env/bin/python -m lsm.run nchunks nmnist)
 #   sbatch --array=0-$((n-1)) slurm/lsm_features.slurm nmnist faithful
 # variant "input" is the no-reservoir baseline (no simulation, seconds per chunk).
+# Optional third argument: reservoir size N (default lsm.size), written to <variant>_N<N>.
 #SBATCH --job-name=lsm_features
 #SBATCH --partition=gpu
 #SBATCH --ntasks=1
@@ -23,4 +24,4 @@ set -e
 [ -f /usr/include/python3.12/Python.h ] || { apt-get update -qq && apt-get install -y -qq python3.12-dev python3 build-essential >/dev/null 2>&1; }
 
 cd ~/programs/The-Asynchronous-State-in-Cortical-Circuits
-PYTHONPATH=src .env/bin/python -m lsm.run features "$1" "$2" "$SLURM_ARRAY_TASK_ID"
+PYTHONPATH=src .env/bin/python -m lsm.run features "$1" "$2" "$SLURM_ARRAY_TASK_ID" ${3:+--size $3}

@@ -3,7 +3,7 @@
     python -m lsm.run calibrate                       background input gains (faithful's E rate)
     python -m lsm.run calibrate_task <dataset>        stimulus input gains (faithful's task rate)
     python -m lsm.run asynchrony <task_index>         one (variant, N, network) background run
-    python -m lsm.run features <dataset> <variant|input> <chunk>   reservoir features, one chunk
+    python -m lsm.run features <dataset> <variant|input> <chunk> [--size N]   one chunk
     python -m lsm.run nchunks <dataset>               chunk count, for the Slurm array
     python -m lsm.run readout <dataset>               train/test every variant's readout
     python -m lsm.run reliability <dataset> <variant> stimulus-locked share of the liquid state
@@ -54,7 +54,15 @@ def _load(dataset: dict, references: list) -> list:
     return samples  # references are train-first, so this keeps their order
 
 
-def features(config: dict, name: str, variant: str, chunk: int) -> str:
+def _sized(config: dict, variant: str, argv: list[str]) -> tuple[dict, str]:
+    """`--size N` overrides lsm.size; its outputs go to <variant>_N<N> so that sizes coexist."""
+    if "--size" not in argv:
+        return config, variant
+    size = int(argv[argv.index("--size") + 1])
+    return {**config, "lsm": {**config["lsm"], "size": size}}, f"{variant}_N{size}"
+
+
+def features(config: dict, name: str, variant: str, chunk: int, folder: str = None) -> str:
     from lsm.reservoir import chunk_features, thinning
 
     dataset = config["lsm"]["datasets"][name]
@@ -65,7 +73,7 @@ def features(config: dict, name: str, variant: str, chunk: int) -> str:
     q = thinning(config, dataset, _load(dataset, references[:min(n_train, config["lsm"]["tasks"]["thinning_samples"])]))
     x, y = chunk_features(config, dataset, variant, _load(dataset, part), q, chunk)
     is_train = np.arange(chunk * size, chunk * size + len(part)) < n_train
-    out_dir = f"{output_path(config, 'lsm_features_dir')}/{name}/{variant}"
+    out_dir = f"{output_path(config, 'lsm_features_dir')}/{name}/{folder or variant}"
     os.makedirs(out_dir, exist_ok=True)
     path = f"{out_dir}/chunk_{chunk:04d}.npz"
     np.savez_compressed(path, x=x, y=y, is_train=is_train, q=q,
@@ -75,7 +83,7 @@ def features(config: dict, name: str, variant: str, chunk: int) -> str:
     return path
 
 
-def repeat_reliability(config: dict, name: str, variant: str) -> dict:
+def repeat_reliability(config: dict, name: str, variant: str, folder: str = None) -> dict:
     """The first lsm.reliability.n_samples TEST samples through one variant twice, with
     independent thinning/background noise but the same reservoir: the stimulus-locked
     fraction of the liquid state's variance (lsm.readout.reliability)."""
@@ -89,9 +97,9 @@ def repeat_reliability(config: dict, name: str, variant: str) -> dict:
     samples = _load(dataset, references[n_train:n_train + n])
     first, second = (chunk_features(config, dataset, variant, samples, q, seed)[0]
                      for seed in config["lsm"]["reliability"]["noise_streams"])
-    row = {"dataset": name, "variant": variant, "n_samples": len(samples),
+    row = {"dataset": name, "variant": folder or variant, "n_samples": len(samples),
            "reliability": reliability(first, second)}
-    path = f"{output_path(config, 'lsm_features_dir')}/{name}/reliability_{variant}.json"
+    path = f"{output_path(config, 'lsm_features_dir')}/{name}/reliability_{folder or variant}.json"
     with open(path, "w") as f:
         json.dump(row, f)
     print(row, flush=True)
@@ -163,9 +171,11 @@ def main():
         dataset = config["lsm"]["datasets"][sys.argv[2]]
         print(math.ceil(len(task_references(config, sys.argv[2])[0]) / dataset["chunk"]))
     elif command == "features":
-        features(config, sys.argv[2], sys.argv[3], int(sys.argv[4]))
+        sized, folder = _sized(config, sys.argv[3], sys.argv)
+        features(sized, sys.argv[2], sys.argv[3], int(sys.argv[4]), folder)
     elif command == "reliability":
-        repeat_reliability(config, sys.argv[2], sys.argv[3])
+        sized, folder = _sized(config, sys.argv[3], sys.argv)
+        repeat_reliability(sized, sys.argv[2], sys.argv[3], folder)
     elif command == "readout":
         readout(config, sys.argv[2])
     elif command == "aggregate":
