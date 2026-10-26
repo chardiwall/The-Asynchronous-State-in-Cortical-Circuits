@@ -90,8 +90,9 @@ def readout(config: dict, name: str) -> list[dict]:
             continue
         x = np.concatenate([c["x"] for c in chunks]); y = np.concatenate([c["y"] for c in chunks])
         train = np.concatenate([c["is_train"] for c in chunks])
-        score = train_and_score(x[train], y[train], x[~train], y[~train],
-                                settings["C"], settings["max_iter"])
+        score = train_and_score(x[train], y[train], x[~train], y[~train], settings["C_grid"],
+                                settings["max_iter"], settings["validation_fraction"],
+                                np.random.default_rng(config["seed"]))
         rows.append({"dataset": name, "variant": os.path.basename(folder), **score})
         print(rows[-1], flush=True)
     path = output_path(config, "lsm_readout_csv")
@@ -101,7 +102,7 @@ def readout(config: dict, name: str) -> list[dict]:
         with open(path) as f:
             old = [r for r in csv.DictReader(f) if r["dataset"] != name]
     with open(path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["dataset", "variant", "train_accuracy",
+        writer = csv.DictWriter(f, fieldnames=["dataset", "variant", "C", "validation_accuracy", "train_accuracy",
                                                "test_accuracy", "n_train", "n_test", "n_features"])
         writer.writeheader()
         writer.writerows(old + rows)

@@ -429,10 +429,12 @@ lsm:
       # 3.011 and 2.884 against an UNscaled X path; at N_X=400 that path is sqrt(10) weaker,
       # so these are 3.011/sqrt(10) and 2.884/sqrt(10) -- the same networks. Rerun after any
       # change to the variants.
-  task_input_gain:              # the same gain for classification runs, CALIBRATED by
-    faithful: 1.0               # `lsm.run calibrate_task` to faithful's mean reservoir rate
-    dense_weak: 1.0             # during training stimuli. PLACEHOLDERS until calibrated.
-    maass: 1.0
+  task_input_gain:              # the same gain for classification runs, CALIBRATED
+    faithful: 1.0               # 2026-10-26 by lsm.calibrate.calibrate_task to faithful's mean
+    dense_weak: 0.559           # reservoir rate during stimuli, 34.9 Hz (dense_weak 34.8 Hz,
+    maass: 0.216                # maass 34.2-35.1 Hz at the final brackets), on the first 6
+      # DVS Gesture TRAINING samples of user01_lab. At the background-matched gains instead,
+      # the same stimuli drive faithful 36 Hz, dense_weak 61 Hz, maass 206 Hz.
   calibration:
     length_s: 5.0
     gain_bounds: [0.3, 12.0]
@@ -474,5 +476,6 @@ lsm:
       n_test: null              # all 264
       chunk: 100
   readout:                      # multinomial logistic regression on standardised bin counts;
-    C: 0.01                     # scaler and model fit on the training split only
+    C_grid: [0.001, 0.01, 0.1, 1.0]   # inverse L2 strength, chosen per variant on a
+    validation_fraction: 0.2    # held-out slice of the TRAINING split, then refit on all of it
     max_iter: 3000

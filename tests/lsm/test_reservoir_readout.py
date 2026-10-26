@@ -22,3 +22,13 @@ def test_readout_scaler_is_fit_on_training_data_only():
     score = train_and_score(train_x, train_y, test_x, train_y, c=1.0, max_iter=500)
     assert score["train_accuracy"] > 0.9
     assert score["test_accuracy"] < 0.7
+
+
+def test_regularisation_is_chosen_on_a_validation_split_of_the_training_data():
+    rng = np.random.default_rng(1)
+    train_x = rng.normal(size=(300, 20)); train_y = (train_x[:, 0] > 0).astype(int)
+    test_x = rng.normal(size=(100, 20)); test_y = (test_x[:, 0] > 0).astype(int)
+    score = train_and_score(train_x, train_y, test_x, test_y, c=[1e-4, 1.0], max_iter=500,
+                            validation_fraction=0.25, rng=rng)
+    assert score["C"] == 1.0                  # 1e-4 under-fits a clean linear problem
+    assert score["test_accuracy"] > 0.9
