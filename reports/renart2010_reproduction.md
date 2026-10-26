@@ -90,8 +90,22 @@ from SOM S-p.20–21):
 
 All ten networks are NaN-free; r̄ is positive but ~6× under the paper's bound.
 
-**3A / 3B panels** come from a single 2000 s network (raster, z-scored tracking, and the r
-histogram against its ±500 ms jittered null) → `figures/fig3a.png`, `figures/fig3b.png`.
+**3A / 3B panels** come from a single network simulated for 2000 s (57 min wall, 33 GB):
+
+![Fig. 3A](figures/fig3a.png)
+
+**3A.** The first second of 500 rate-sorted cells (400 E green, 100 I red): sparse,
+irregular firing with no population events. Below, the z-scored E, I and X population
+activities (3 ms bins). Over the whole run **I tracks E with a zero-lag correlation of 0.62**.
+The E–X correlation is only 0.08 here, because X is a set of independent Poisson trains whose
+pooled activity is white noise, with no slow fluctuation to track at 3 ms resolution.
+
+![Fig. 3B](figures/fig3b_2000s.png)
+
+**3B.** All 499 500 E–E pairs of a 1000-cell sample, T = 50 ms. Measured: **r̄ = 1.4 × 10⁻⁴,
+σ_r = 0.0054**. Jittered surrogate (±500 ms): r̄ = 3 × 10⁻⁶, σ_r = 0.0041. The distribution
+is centred on zero and **wider than its null**: pairs carry real correlations of both signs
+while the population average vanishes. That is the asynchronous state, and the paper's panel.
 
 ![Fig. 3C](figures/fig3c.png)
 
@@ -135,8 +149,9 @@ and almost nothing is left. In vitro this needs only paired whole-cell recording
 - **Fig. 2C is a reduced sweep**: 40 000 τ per realisation and 5–20 realisations per N, against
   the paper's 200 000 τ and 50. Every N up to 8192 is kept, and each point's noise is ~√5
   wider. The paper's protocol costs ~16–24 h per N = 8192 realisation here.
-- **Fig. 3B at 2000 s, not 5000 s.** It is bounded by the 16 GB rate matrix, not by
-  simulation. The jittered null is ~0.004 wide, against 0.0027 in the paper.
+- **Fig. 3B shown at 2000 s.** The SOM's 5000 s run (40 GB rate matrix) was submitted
+  after the 2000 s one finished in under an hour. At 2000 s the null is 0.0041 wide,
+  against 0.0027 at 5000 s.
 - **I rate 3.98 Hz vs 3.6 Hz** (+10 %), consistent over all 10 networks. E rate and r̄ are on
   target.
 - **Inferred, not stated, in the SOM** (all labelled in `config.yaml`):
