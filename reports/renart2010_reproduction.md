@@ -69,8 +69,21 @@ follows excitation, which follows the external input, and the tracking tightens 
 large: II +0.25, EE +0.11, XX +0.04. The E–I terms are large and **negative** (EI, IE ≈ −0.16).
 The total is only **+0.017**, and its peak shrinks from N = 1024 to 8192 (inset).
 
-**2C. Scaling with N.** *(reduced sweep, see §4)* — `r̄` and `c` against N for N = 100 … 8192.
-→ `figures/fig2c.png` (added when the sweep lands; see §5 for status).
+![Fig. 2C](figures/fig2c.png)
+
+**2C. The scaling law, the block's central result** *(reduced sweep, see §4)*. Hollow markers
+are negative values, plotted by magnitude.
+
+| N | 100 | 178 | 316 | 562 | 1000 | 1780 | 3160 |
+|---|---|---|---|---|---|---|---|
+| r̄ (EE) | 2.0e-2 | 1.3e-2 | 8.5e-3 | 4.9e-3 | 2.6e-3 | 1.4e-3 | 6.9e-4 |
+| c (total) | 0.084 | 0.069 | 0.059 | 0.049 | 0.039 | 0.031 | 0.025 |
+| c_EI | −0.10 | −0.13 | −0.16 | −0.18 | −0.18 | −0.18 | −0.17 |
+
+r̄ falls exactly along 1/N: 29× over a 32× range of N. The total current correlation falls
+as ~1/√N, 3.4× against √32 = 5.7, approaching that rate at large N. The components stay
+O(0.1–0.25) and **c_EI grows more negative** as N grows. That is the cancellation: each term
+stays large, while their sum vanishes.
 
 ![Fig. 2G](figures/fig2g.png)
 
