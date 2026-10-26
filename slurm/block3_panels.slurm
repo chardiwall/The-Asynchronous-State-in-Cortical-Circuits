@@ -5,23 +5,18 @@
 # Not an array job: 3A is one illustrative network and 3B's histogram is over pairs within
 # that network, not over networks. Length comes from spiking_network.panels.length_s.
 #
-# 1000 s, NOT the 5000 s Fig. S6 states -- a deliberate, documented deviation (GitHub #8).
-# Measured 27.1 h per 200 s on this node, so 1000 s is ~135 h, inside the 168 h limit below
-# with ~24% margin; 5000 s would be ~28 days uncheckpointed. The cost is that Fig. 3B's
-# jittered null is 0.0056 wide rather than 0.0027, so the separation from the measured
-# histogram is real but weaker than the published panel's. config.yaml has the numbers.
-#
-# --mem=24G: the rate matrix is 8GB at this length and numpy.corrcoef adds a centred copy,
-# on top of the ~4GB network state measured for the 200 s run. block3.figures_ab refuses to start
-# if the matrix would exceed panels.max_rate_matrix_gb, so a misconfiguration fails in
-# seconds rather than after five days.
+# 5000 s, the length Fig. S6 states. Since block 3 integrates its synapses per neuron, a
+# 2000 s run measured 57 min wall and 33 GB peak RSS, so 5000 s is ~2.5 h. Memory is the
+# cost: the Fig. 3B rate matrix is 40 GB and numpy.corrcoef adds a centred copy, hence
+# --mem=100G. block3.figures_ab refuses to start if the matrix would exceed
+# panels.max_rate_matrix_gb, so a misconfiguration fails in seconds, not after the run.
 #   sbatch slurm/block3_panels.slurm
 #SBATCH --job-name=block3_panels
 #SBATCH --partition=gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=48G
-#SBATCH --time=14:00:00
+#SBATCH --mem=100G
+#SBATCH --time=06:00:00
 #SBATCH --output=artifacts/block3_panels/slurm.out
 #SBATCH --container-image=/home/chardiwall/.local/share/asyncstate-py312.sqsh
 #SBATCH --container-remap-root

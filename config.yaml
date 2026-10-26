@@ -289,20 +289,14 @@ spiking_network:
     length_s: 200.0            # 5000 s for the Fig. S6 characterisation run
     n_networks: 10
   panels:                       # Fig. 3A/3B's single-network run (block3.run panels)
-    length_s: 2000.0            # DELIBERATE DEVIATION from the paper's 5000 s (Fig. S6:
-      # "All data comes from a single network simulated for 5000 s"; Fig. 3's own caption
-      # states no length). Since the per-neuron synaptic integration (2026-10-26) the
-      # simulation itself is no longer the limit -- ~6 s wall per simulated second -- the
-      # Fig. 3B rate matrix is: (r_bar_sample_size, n_windows) float64 is 16GB at 2000 s
-      # and 40GB at 5000 s, and numpy.corrcoef adds a centred copy on top.
-      #
-      # What it costs scientifically, measured not guessed. Fig. 3B's claim is that the
-      # measured histogram is wide RELATIVE to its jittered null, and the null's width is
-      # pure estimator noise -- sigma_r for independent 1 Hz trains at T=50 ms is
-      #     200 s -> 0.0114     1000 s -> 0.0056     2000 s -> ~0.004     5000 s -> 0.0027
-      # on an axis spanning +-0.05. r_bar itself averages over ~500k pairs and is
-      # unaffected at any of these lengths; only sigma_r is. See GitHub #8.
-    max_rate_matrix_gb: 20.0    # NOT a paper value -- a guard, sized against block3_panels.slurm's
+    length_s: 5000.0            # the SOM's own value (Fig. S6: "a single network simulated
+      # for 5000 s"; Fig. 3's caption states no length). Reachable since the per-neuron
+      # synaptic integration (2026-10-26): a 2000 s run measured 57 min wall and 33 GB peak
+      # RSS, so 5000 s is ~2.5 h and ~80 GB -- the cost is now the Fig. 3B rate matrix,
+      # (r_bar_sample_size, n_windows) float64 = 40 GB, plus numpy.corrcoef's centred copy.
+      # Earlier passes used 1000 s and 2000 s (GitHub #8). sigma_r of the jittered null at
+      # T = 50 ms: 200 s 0.0114, 1000 s 0.0056, 2000 s ~0.004, 5000 s 0.0027.
+    max_rate_matrix_gb: 45.0    # NOT a paper value -- a guard, sized against block3_panels.slurm's
       # --mem. block3.measure.pairwise_correlations stacks an (r_bar_sample_size, n_windows) float64
       # matrix, n*(length_s*1000 - burn_in_ms)/bin_dt_ms*8 bytes: 1.6GB at 200 s, 8GB at
       # 1000 s, 40GB at 5000 s, and numpy.corrcoef adds a centred copy on top.
