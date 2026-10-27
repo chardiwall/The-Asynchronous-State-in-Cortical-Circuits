@@ -29,8 +29,17 @@ def _tracking(a: np.ndarray, b: np.ndarray) -> float:
 def build_background(config: dict, variant: str, n: int, network_index: int):
     lsm = config["lsm"]
     n_x = round(lsm["external_per_recurrent"] * n)
-    params = network_params(config, variant, n, n_x)
     rng = np.random.default_rng(config["seed"] + 1000 * network_index + n)
+    if variant in lsm["designs"]:   # a published liquid, at N = n, under the same Poisson X
+        from lsm.designs import build_design
+
+        sized = {**config, "lsm": {**lsm, "size": n}}
+        n_e = round(lsm["excitatory_fraction"] * n)
+        params = {"populations": {"n_excitatory": n_e, "n_inhibitory": n - n_e, "n_external": n_x}}
+        net = build_design(sized, variant, n_x, config["spiking_network"]["external_input"], rng,
+                           gain_key="input_gain")
+        return net, params, rng
+    params = network_params(config, variant, n, n_x)
     return build_network(params, rng, connect=build_connect(config, variant, params, rng)), params, rng
 
 

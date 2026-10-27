@@ -43,16 +43,22 @@ def chunk_features(config: dict, dataset: dict, variant: str, samples: list, q: 
     if variant == "input":
         return bin_counts(idx, t_ms, n_x, onsets, dataset["window_ms"], dataset["n_bins"]), labels
 
-    params = network_params(config, variant, lsm["size"], n_x, gain_key="task_input_gain")
-    params["external_input"] = {"kind": "spike_generator", "indices": idx, "times_ms": t_ms}
+    external = {"kind": "spike_generator", "indices": idx, "times_ms": t_ms}
     net_rng = np.random.default_rng(config["seed"])  # one fixed reservoir per variant
-    net = build_network(params, net_rng, connect=build_connect(config, variant, params, net_rng))
+    if variant in lsm["designs"]:
+        from lsm.designs import build_design
+
+        net = build_design(config, variant, n_x, external, net_rng, gain_key="task_input_gain")
+    else:
+        params = network_params(config, variant, lsm["size"], n_x, gain_key="task_input_gain")
+        params["external_input"] = external
+        net = build_network(params, net_rng, connect=build_connect(config, variant, params, net_rng))
     end_ms = onsets[-1] + dataset["window_ms"] + tasks["gap_ms"]
     net.network.run(end_ms * b2.ms)
     v = np.asarray(net.group_e.V / b2.mV)
     assert not np.any(np.isnan(v)), f"NaN in {variant} reservoir, chunk {chunk_index}"
 
-    n_e = params["populations"]["n_excitatory"]
+    n_e = len(net.group_e)
     neuron = np.concatenate([np.asarray(net.spikes_e.i), n_e + np.asarray(net.spikes_i.i)])
     t = np.concatenate([np.asarray(net.spikes_e.t / b2.ms), np.asarray(net.spikes_i.t / b2.ms)])
     return bin_counts(neuron, t, lsm["size"], onsets, dataset["window_ms"], dataset["n_bins"]), labels

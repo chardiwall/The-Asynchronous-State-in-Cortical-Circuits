@@ -20,12 +20,25 @@ def _bisect(rate_at, target: float, bounds, iterations: int) -> float:
     return math.exp(0.5 * (low + high))
 
 
+def _others(lsm: dict, only) -> list[str]:
+    """Every variant and published design but faithful (the reference), or just `only`."""
+    return [v for v in (*lsm["variants"], *lsm["designs"]) if v != "faithful" and (not only or v in only)]
+
+
+def _search(lsm: dict, variant: str, bounds_key: str) -> tuple:
+    """(bounds, iterations): the published designs get a six-decade bracket."""
+    settings = lsm["calibration"]
+    if variant in lsm["designs"]:
+        return settings["design_gain_bounds"], settings["design_iterations"]
+    return settings[bounds_key], settings["iterations"]
+
+
 def _with_gain(config: dict, key: str, variant: str, gain: float) -> dict:
     lsm = config["lsm"]
     return {**config, "lsm": {**lsm, key: {**lsm[key], variant: gain}}}
 
 
-def calibrate(config: dict) -> dict:
+def calibrate(config: dict, only=None) -> dict:
     lsm, settings = config["lsm"], config["lsm"]["calibration"]
 
     def e_rate(variant, gain):
@@ -37,14 +50,12 @@ def calibrate(config: dict) -> dict:
 
     target = e_rate("faithful", 1.0)
     gains = {"target_rate_excitatory_hz": target}
-    for variant in lsm["variants"]:
-        if variant != "faithful":
-            gains[variant] = _bisect(lambda g: e_rate(variant, g), target,
-                                     settings["gain_bounds"], settings["iterations"])
+    for variant in _others(lsm, only):
+        gains[variant] = _bisect(lambda g: e_rate(variant, g), target, *_search(lsm, variant, "gain_bounds"))
     return gains
 
 
-def calibrate_task(config: dict, dataset: dict, train_samples: list) -> dict:
+def calibrate_task(config: dict, dataset: dict, train_samples: list, only=None) -> dict:
     from lsm.reservoir import chunk_features, thinning
 
     lsm, settings = config["lsm"], config["lsm"]["calibration"]
@@ -60,8 +71,6 @@ def calibrate_task(config: dict, dataset: dict, train_samples: list) -> dict:
 
     target = rate("faithful", 1.0)
     gains = {"target_rate_hz": target}
-    for variant in lsm["variants"]:
-        if variant != "faithful":
-            gains[variant] = _bisect(lambda g: rate(variant, g), target,
-                                     settings["task_gain_bounds"], settings["iterations"])
+    for variant in _others(lsm, only):
+        gains[variant] = _bisect(lambda g: rate(variant, g), target, *_search(lsm, variant, "task_gain_bounds"))
     return gains

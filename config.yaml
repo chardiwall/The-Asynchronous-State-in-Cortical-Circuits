@@ -425,18 +425,26 @@ lsm:
       # 3.011 and 2.884 against an UNscaled X path; at N_X=400 that path is sqrt(10) weaker,
       # so these are 3.011/sqrt(10) and 2.884/sqrt(10) -- the same networks. Rerun after any
       # change to the variants.
+    maass2002: 1.0              # lsm.designs: multiplies the design's own X weights.
+    kaiser2017: 1.0             # UNCALIBRATED placeholders until `lsm.run calibrate` is run
+    wijesinghe2019: 1.0
   task_input_gain:              # the same gain for classification runs, CALIBRATED
     faithful: 1.0               # 2026-10-26 by lsm.calibrate.calibrate_task to faithful's mean
     dense_weak: 0.559           # reservoir rate during stimuli, 34.9 Hz (dense_weak 34.8 Hz,
     maass: 0.216                # maass 34.2-35.1 Hz at the final brackets), on the first 6
       # DVS Gesture TRAINING samples of user01_lab. At the background-matched gains instead,
       # the same stimuli drive faithful 36 Hz, dense_weak 61 Hz, maass 206 Hz.
+    maass2002: 1.0              # UNCALIBRATED placeholders until `lsm.run calibrate_task`
+    kaiser2017: 1.0
+    wijesinghe2019: 1.0
   calibration:
     length_s: 5.0
     gain_bounds: [0.3, 12.0]
     task_gain_bounds: [0.05, 2.0]
     task_samples: 6             # training samples (dvs_gesture) the task gains are fit on
     iterations: 8               # bisection on log-gain
+    design_gain_bounds: [1.0e-4, 100.0]   # lsm.designs: their published input weights were
+    design_iterations: 14       # set for other inputs, so the bracket spans six decades
   asynchrony:                   # background-only runs: block 3's Poisson X at 2.5 Hz
     sizes: [250, 500, 1000, 2000, 5000]   # faithful family; the others at lsm.size only
     length_s: 100.0
@@ -471,6 +479,62 @@ lsm:
       n_train: null             # all 1077
       n_test: null              # all 264
       chunk: 100
+  designs:                      # three PUBLISHED liquids at N=500 (400 E / 100 I), as compared
+    # by Woo et al. 2024 (Physica A 633:129334, Table 1), each built from its primary source.
+    # Units: mV, ms, MOhm; weights in nA (current neurons) or nS (conductance neurons).
+    # Pair keys are pre_to_post. Weight specs: gamma{mean,cv} | normal_clipped{mean,cv} (NEST:
+    # redrawn until the sign is right) | normal{mean,cv} | uniform{low,high}; mean < 0 = inhibitory.
+    # The X (input) weights are multiplied by lsm.input_gain / task_input_gain, as every variant.
+    maass2002:                  # Maass, Natschlaeger & Markram 2002, Neural Comput., Appendix B
+      neuron: current           # tau_m dV/dt = -(V - V_L) + R_m (I_E + I_I + I_X + I_back)
+      tau_syn_ms: {E: 3.0, I: 6.0}          # exponential PSC, by presynaptic type; X is excitatory
+      E: {tau_m: 30.0, r_m: 1.0, v_leak: 0.0, v_threshold: 15.0, v_reset: 13.5, t_ref: 3.0, i_back_nA: 13.5}
+      I: {tau_m: 30.0, r_m: 1.0, v_leak: 0.0, v_threshold: 15.0, v_reset: 13.5, t_ref: 2.0, i_back_nA: 13.5}
+      initial_v: [13.5, 15.0]   # uniform, as Maass; R_m I_back = 13.5 mV < 15 mV: silent alone
+      wiring: column            # lsm.column: the same 5x5x20 sites, lambda = 2, C = .3/.2/.4/.1.
+        # Measured 3620 links (EE 2383, E->I 398, I->E 793, II 47) vs the review's 3630 +- 15;
+        # the review's split (594/578/143) implies C = 0.3 for EVERY pair, contrary to Maass.
+      stp_cv: 0.5               # U, D, F ~ Gaussian, SD 50 % of mean; negatives redrawn from
+        # U(0, 2*mean) -- Maass: "an appropriate uniform distribution" (the range is inferred)
+      pairs:
+        E_to_E: {weight: {gamma: {mean: 30.0, cv: 1.0}}, delay: 1.5, stp: {U: 0.5, D: 1100.0, F: 50.0}}
+        E_to_I: {weight: {gamma: {mean: 60.0, cv: 1.0}}, delay: 0.8, stp: {U: 0.05, D: 125.0, F: 1200.0}}
+        I_to_E: {weight: {gamma: {mean: -19.0, cv: 1.0}}, delay: 0.8, stp: {U: 0.25, D: 700.0, F: 20.0}}
+        I_to_I: {weight: {gamma: {mean: -19.0, cv: 1.0}}, delay: 0.8, stp: {U: 0.32, D: 144.0, F: 60.0}}
+        X_to_E: {p: 0.3, weight: {gamma: {mean: 18.0, cv: 1.0}}, delay: 0.0}   # "30 % randomly
+        X_to_I: {p: 0.3, weight: {gamma: {mean: 9.0, cv: 1.0}}, delay: 0.0}    # chosen neurons";
+          # static and undelayed: Maass gives no STP or delay for input synapses
+    kaiser2017:                 # Kaiser et al. 2017, Bioinspir. Biomim. 12:055001; values from
+      neuron: current           # their released NEST code (github.com/IGITUGraz/LSM, lsm/nest)
+      tau_syn_ms: {E: 3.0, I: 2.0}          # iaf_psc_exp tau_syn_ex / tau_syn_in
+      E: {tau_m: 30.0, r_m: 1000.0, v_leak: 0.0, v_threshold: 15.0, v_reset: 13.8, t_ref: 2.0, i_back_nA: 0.0145}
+      I: {tau_m: 30.0, r_m: 1000.0, v_leak: 0.0, v_threshold: 15.0, v_reset: 13.8, t_ref: 2.0, i_back_nA: 0.0145}
+      initial_v: [0.0, 0.0]     # NEST starts V_m at E_L
+      wiring: indegree          # NEST fixed_indegree (autapses and multapses allowed): 2 E + 1 I
+      stp_cv: 0.0               # fixed per pair type
+      delay: {mean: 10.0, sd: 20.0, low: 3.0, high: 200.0}   # normal_clipped, every connection
+      pairs:
+        E_to_E: {k: 2, weight: {normal_clipped: {mean: 0.05, cv: 0.7}}, stp: {U: 0.59, D: 813.0, F: 1.0}}
+        E_to_I: {k: 2, weight: {normal_clipped: {mean: 0.25, cv: 0.7}}, stp: {U: 0.049, D: 399.0, F: 1790.0}}
+        I_to_E: {k: 1, weight: {normal_clipped: {mean: -0.2, cv: 0.7}}, stp: {U: 0.016, D: 45.0, F: 376.0}}
+        I_to_I: {k: 1, weight: {normal_clipped: {mean: -0.2, cv: 0.7}}, stp: {U: 0.25, D: 706.0, F: 21.0}}
+        X_to_E: {outdegree: 100, weight: {uniform: {low: 0.125, high: 0.375}}}   # inject_spikes
+      noise: {rate_hz: 25.0, weight: {normal: {mean: 0.001, cv: 0.7}}}  # an independent Poisson
+        # train per neuron (NEST poisson_generator), into I_X; its delay only shifts a Poisson train
+    wijesinghe2019:             # Wijesinghe et al. 2019, Front. Neurosci. 13:504 (Tables 1-2);
+      neuron: conductance       # Diehl & Cook 2015 dynamics, which they follow:
+      # tau_m dV/dt = -(V - V_L) + R_m (g_E (E_exc - V) + g_I (E_inh - V) + g_X (E_exc - V))
+      tau_syn_ms: {E: 1.0, I: 2.0}          # tau_ge, tau_gi
+      E: {tau_m: 100.0, r_m: 1000.0, v_leak: -65.0, v_threshold: -52.0, v_reset: -65.0, t_ref: 5.0, e_exc: 0.0, e_inh: -100.0}
+      I: {tau_m: 10.0, r_m: 1000.0, v_leak: -60.0, v_threshold: -40.0, v_reset: -45.0, t_ref: 2.0, e_exc: 0.0, e_inh: -85.0}
+        # reversal potentials are Diehl & Cook's (not stated by Wijesinghe et al.)
+      initial_v: null          # V_L
+      wiring: bernoulli         # random binary mask, no self-connections (63 840 = 0.4*400*399)
+      pairs:                    # W ~ U(0, 1) nS: R_m W in [0, 1], Diehl & Cook's units
+        E_to_E: {p: 0.4, weight: {uniform: {low: 0.0, high: 1.0}}}
+        E_to_I: {p: 0.4, weight: {uniform: {low: 0.0, high: 1.0}}}
+        I_to_E: {p: 0.5, weight: {uniform: {low: 0.0, high: 1.0}}}
+        X_to_E: {p: 0.1, weight: {uniform: {low: 0.0, high: 1.0}}}   # MNIST's 10 %, E only
   reliability:                  # same TEST samples twice, independent noise, same reservoir
     n_samples: 100
     noise_streams: [10001, 10002]   # chunk-index seeds, disjoint from the feature chunks'

@@ -1,7 +1,7 @@
 """The LSM extension's one entry point.
 
-    python -m lsm.run calibrate                       background input gains (faithful's E rate)
-    python -m lsm.run calibrate_task <dataset>        stimulus input gains (faithful's task rate)
+    python -m lsm.run calibrate [variant ...]         background input gains (faithful's E rate)
+    python -m lsm.run calibrate_task <dataset> [variant ...]   stimulus gains (faithful's task rate)
     python -m lsm.run asynchrony <task_index>         one (variant, N, network) background run
     python -m lsm.run features <dataset> <variant|input> <chunk> [--size N]   one chunk
     python -m lsm.run nchunks <dataset>               chunk count, for the Slurm array
@@ -30,10 +30,11 @@ ASYNCHRONY_FIELDS = ["variant", "n", "network_index", "length_s", "rate_excitato
 
 
 def asynchrony_grid(config: dict) -> list[dict]:
-    """The faithful family at every size (the 1/N test), the other variants at lsm.size."""
+    """The faithful family at every size (the 1/N test), the other variants and the published
+    designs at lsm.size. Designs come last, so the earlier task indices are unchanged."""
     lsm = config["lsm"]
     cells = [("faithful", n) for n in lsm["asynchrony"]["sizes"]]
-    cells += [(v, lsm["size"]) for v in lsm["variants"] if v != "faithful"]
+    cells += [(v, lsm["size"]) for v in (*lsm["variants"], *lsm["designs"]) if v != "faithful"]
     return [{"variant": v, "n": n, "network_index": k}
             for v, n in cells for k in range(lsm["asynchrony"]["n_networks"])]
 
@@ -148,9 +149,12 @@ def main():
     if command == "calibrate":
         from lsm.calibrate import calibrate
 
-        gains = calibrate(config)
+        gains = calibrate(config, sys.argv[2:])
         path = output_path(config, "lsm_calibration_json")
         os.makedirs(os.path.dirname(path), exist_ok=True)
+        if os.path.exists(path):   # merge, so a subset run keeps the other variants' gains
+            with open(path) as f:
+                gains = {**json.load(f), **gains}
         with open(path, "w") as f:
             json.dump(gains, f, indent=1)
         print(gains)
@@ -160,7 +164,7 @@ def main():
         dataset = config["lsm"]["datasets"][sys.argv[2]]
         references, _ = task_references(config, sys.argv[2])
         n = config["lsm"]["calibration"]["task_samples"]
-        print(calibrate_task(config, dataset, _load(dataset, references[:n])))
+        print(calibrate_task(config, dataset, _load(dataset, references[:n]), sys.argv[3:]))
     elif command == "asynchrony":
         task = asynchrony_grid(config)[int(sys.argv[2])]
         row = run_background(config, task["variant"], task["n"], task["network_index"],
