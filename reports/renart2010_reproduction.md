@@ -103,7 +103,8 @@ from SOM S-p.20–21):
 
 All ten networks are NaN-free; r̄ is positive but ~6× under the paper's bound.
 
-**3A / 3B panels** come from a single network simulated for 2000 s (57 min wall, 33 GB):
+**3A / 3B panels** come from a single network simulated for **5000 s, the SOM's length**
+(4 h 41 min wall on an efficiency core, 82 GB peak):
 
 ![Fig. 3A](figures/fig3a.png)
 
@@ -113,12 +114,17 @@ activities (3 ms bins). Over the whole run **I tracks E with a zero-lag correlat
 The E–X correlation is only 0.08 here, because X is a set of independent Poisson trains whose
 pooled activity is white noise, with no slow fluctuation to track at 3 ms resolution.
 
-![Fig. 3B](figures/fig3b_2000s.png)
+![Fig. 3B](figures/fig3b.png)
 
-**3B.** All 499 500 E–E pairs of a 1000-cell sample, T = 50 ms. Measured: **r̄ = 1.4 × 10⁻⁴,
-σ_r = 0.0054**. Jittered surrogate (±500 ms): r̄ = 3 × 10⁻⁶, σ_r = 0.0041. The distribution
+**3B.** All 499 500 E–E pairs of a 1000-cell sample, T = 50 ms. Measured: **r̄ = 1.5 × 10⁻⁴,
+σ_r = 0.0044**. Jittered surrogate (±500 ms): r̄ = −2 × 10⁻⁶, σ_r = 0.0026. The distribution
 is centred on zero and **wider than its null**: pairs carry real correlations of both signs
 while the population average vanishes. That is the asynchronous state, and the paper's panel.
+
+Recording length is a convergence check. From 2000 s to 5000 s the null narrows as 1/√T
+(0.0041 → 0.0026, ratio 1.58 against √2.5 = 1.58), while the measured width settles at
+0.0044. The excess, √(0.0044² − 0.0026²) ≈ 0.0035, is real pair-to-pair structure, not
+finite-sample noise. r̄ is the same at both lengths (1.4 and 1.5 × 10⁻⁴).
 
 ![Fig. 3C](figures/fig3c.png)
 
@@ -155,16 +161,13 @@ and almost nothing is left. In vitro this needs only paired whole-cell recording
    conductance term now sits inside the `rk2` step with V, which removes a former Euler caveat.
 2. Because of (1), **every Fig. 3 protocol ran at the paper's own length**: 10 × 200 s networks
    and the full 90-task Fig. 3C–D (10 networks × 9 conditions × 50 s). Fig. 3B grew from
-   1000 s to 2000 s.
+   1000 s to the SOM's 5000 s.
 
 ## 4. Deviations to state on the slides
 
 - **Fig. 2C is a reduced sweep**: 40 000 τ per realisation and 5–20 realisations per N, against
   the paper's 200 000 τ and 50. Every N up to 8192 is kept, and each point's noise is ~√5
   wider. The paper's protocol costs ~16–24 h per N = 8192 realisation here.
-- **Fig. 3B shown at 2000 s.** The SOM's 5000 s run (40 GB rate matrix) was submitted
-  after the 2000 s one finished in under an hour. At 2000 s the null is 0.0041 wide,
-  against 0.0027 at 5000 s.
 - **I rate 3.98 Hz vs 3.6 Hz** (+10 %), consistent over all 10 networks. E rate and r̄ are on
   target.
 - **Inferred, not stated, in the SOM** (all labelled in `config.yaml`):
@@ -194,7 +197,7 @@ and almost nothing is left. In vitro this needs only paired whole-cell recording
 ```bash
 pip install -r requirements.txt && pytest                  # all tests
 sbatch slurm/block3_networks.slurm                         # 3A-B statistics, 10 tasks, ~12 min each
-sbatch slurm/block3_panels.slurm                           # 3A/3B panels, 2000 s
+sbatch slurm/block3_panels.slurm                           # 3A/3B panels, 5000 s, 100G
 sbatch slurm/block3_vm_ccg.slurm                           # 3C-D, 90 tasks, ~8 min each
 PYTHONPATH=src python -m block3.run aggregate && PYTHONPATH=src python -m block3.run plot
 # Block 2: see src/block2/README.md (sweep + current arrays, then aggregate, plot)

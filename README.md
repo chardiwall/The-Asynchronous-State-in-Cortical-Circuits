@@ -52,7 +52,7 @@ from the 2026-10-26 cluster pass are in [`reports/`](reports/):
 |---|---|---|
 | 1 | complete | Fig. 1 B/C/E/F, at the paper's full `length_s = 10000` |
 | 2 | complete | Panels 2B/2D/2E/2G; Fig. 2C from a reduced sweep (40000 τ, ≤20 realisations per N) |
-| 3 | complete | Fig. 3A–B statistics (10 × 200 s, the paper's protocol), Fig. 3C–D (all 90 tasks), Fig. 3A/3B panels at 2000 s |
+| 3 | complete | Fig. 3A–B statistics (10 × 200 s, the paper's protocol), Fig. 3C–D (all 90 tasks), Fig. 3A/3B panels at the paper's 5000 s |
 
 - [`reports/renart2010_reproduction.md`](reports/renart2010_reproduction.md) — the
   reproduction: every figure, the numbers against the paper's, and the deviations.

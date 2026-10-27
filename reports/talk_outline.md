@@ -27,10 +27,12 @@ How can dense networks be asynchronous? Shared input should force correlations o
 - r̄ falls as 1/N (2.0e-2 → 6.9e-4 over N = 100 → 3160), c as ~1/√N; components stay O(1).
 - Say: "nothing is fine-tuned; the cancellation is dynamical."
 
-**6. Fig. 3A/3B — a realistic conductance-based network (2 min).** `fig3a.png`, `fig3b_2000s.png`
+**6. Fig. 3A/3B — a realistic conductance-based network (2 min).** `fig3a.png`, `fig3b.png`
 - 4000 E + 1000 I + 4000 Poisson inputs, p = 0.2, SOM parameters.
 - 10 networks × 200 s: E 1.04 Hz, I 3.98 Hz (paper 1.0 / 3.6), r̄ = 1.6 × 10⁻⁴ (paper < 10⁻³).
-- 3B: 499 500 pairs, centred on 0 and wider than the jittered null (σ 0.0054 vs 0.0041).
+- 3B at the paper's 5000 s: 499 500 pairs, r̄ = 1.5 × 10⁻⁴, centred on 0 and wider than the
+  jittered null (σ 0.0044 vs 0.0026). The null narrows as 1/√T from 2000 s, the measured
+  width does not: the spread is real.
 
 **7. Fig. 3C/3D — the testable prediction (2 min).** `fig3c.png`, `fig3d.png`
 - Voltage CCGs with spiking off: EPSP–EPSP +0.25, IPSP–IPSP +0.16, **EPSP–IPSP −0.19**,
