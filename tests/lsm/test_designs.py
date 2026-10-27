@@ -119,7 +119,9 @@ def test_a_design_runs_as_a_reservoir_and_gives_one_feature_row_per_sample():
 
 
 def test_design_background_run_gives_an_exact_current_decomposition():
-    row = run_background(CONFIG, "maass2002", n=500, network_index=0, length_s=1.0)
+    # gain pinned at 1 (strongly driven), so the check does not depend on the calibration
+    driven = {**CONFIG, "lsm": {**CONFIG["lsm"], "input_gain": {**CONFIG["lsm"]["input_gain"], "maass2002": 1.0}}}
+    row = run_background(driven, "maass2002", n=500, network_index=0, length_s=1.0)
     assert row["variant"] == "maass2002" and row["rate_excitatory_hz"] > 0
     parts = row["c_EE"] + row["c_II"] + row["c_XX"] + 2 * (row["c_EI"] + row["c_EX"] + row["c_IX"])
     assert np.isclose(parts, row["c_total"])

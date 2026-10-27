@@ -31,29 +31,42 @@ def bin_counts(neuron, t_ms, n_neurons, onsets, window_ms, n_bins) -> np.ndarray
     return features.reshape(len(onsets), -1)
 
 
-def chunk_features(config: dict, dataset: dict, variant: str, samples: list, q: float,
-                   chunk_index: int) -> tuple[np.ndarray, np.ndarray]:
+def chunk_network(config: dict, dataset: dict, variant: str, samples: list, q: float,
+                  chunk_index: int):
+    """The variant's fixed reservoir wired to this chunk's X spike train, not yet run.
+    Returns (net, onsets_ms, labels, end_ms); for variant "input" (the no-reservoir
+    baseline) the X spikes (indices, times_ms) take net's place."""
     lsm, net_config = config["lsm"], config["spiking_network"]
     tasks = lsm["tasks"]
     dataset = {**dataset, "dt_ms": net_config["simulation"]["dt_ms"]}
     input_rng = np.random.default_rng(config["seed"] + tasks["seed_offset"] + chunk_index)
     idx, t_ms, onsets, labels = chunk_spike_train(samples, dataset, q, tasks["background_hz"],
                                                   net_config["burn_in_ms"], tasks["gap_ms"], input_rng)
+    end_ms = onsets[-1] + dataset["window_ms"] + tasks["gap_ms"]
     n_x = n_channels(dataset["sensor"], dataset["pool"])
     if variant == "input":
-        return bin_counts(idx, t_ms, n_x, onsets, dataset["window_ms"], dataset["n_bins"]), labels
+        return (idx, t_ms), onsets, labels, end_ms
 
     external = {"kind": "spike_generator", "indices": idx, "times_ms": t_ms}
     net_rng = np.random.default_rng(config["seed"])  # one fixed reservoir per variant
     if variant in lsm["designs"]:
         from lsm.designs import build_design
 
-        net = build_design(config, variant, n_x, external, net_rng, gain_key="task_input_gain")
-    else:
-        params = network_params(config, variant, lsm["size"], n_x, gain_key="task_input_gain")
-        params["external_input"] = external
-        net = build_network(params, net_rng, connect=build_connect(config, variant, params, net_rng))
-    end_ms = onsets[-1] + dataset["window_ms"] + tasks["gap_ms"]
+        return build_design(config, variant, n_x, external, net_rng, gain_key="task_input_gain"), onsets, labels, end_ms
+    params = network_params(config, variant, lsm["size"], n_x, gain_key="task_input_gain")
+    params["external_input"] = external
+    net = build_network(params, net_rng, connect=build_connect(config, variant, params, net_rng))
+    return net, onsets, labels, end_ms
+
+
+def chunk_features(config: dict, dataset: dict, variant: str, samples: list, q: float,
+                   chunk_index: int) -> tuple[np.ndarray, np.ndarray]:
+    net, onsets, labels, end_ms = chunk_network(config, dataset, variant, samples, q, chunk_index)
+    if variant == "input":
+        idx, t_ms = net
+        n_x = n_channels(dataset["sensor"], dataset["pool"])
+        return bin_counts(idx, t_ms, n_x, onsets, dataset["window_ms"], dataset["n_bins"]), labels
+
     net.network.run(end_ms * b2.ms)
     v = np.asarray(net.group_e.V / b2.mV)
     assert not np.any(np.isnan(v)), f"NaN in {variant} reservoir, chunk {chunk_index}"
@@ -61,4 +74,5 @@ def chunk_features(config: dict, dataset: dict, variant: str, samples: list, q: 
     n_e = len(net.group_e)
     neuron = np.concatenate([np.asarray(net.spikes_e.i), n_e + np.asarray(net.spikes_i.i)])
     t = np.concatenate([np.asarray(net.spikes_e.t / b2.ms), np.asarray(net.spikes_i.t / b2.ms)])
-    return bin_counts(neuron, t, lsm["size"], onsets, dataset["window_ms"], dataset["n_bins"]), labels
+    size = config["lsm"]["size"]
+    return bin_counts(neuron, t, size, onsets, dataset["window_ms"], dataset["n_bins"]), labels

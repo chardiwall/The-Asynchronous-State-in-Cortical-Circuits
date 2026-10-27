@@ -22,6 +22,12 @@ from block3.model import build_network
 from lsm.variants import build_connect, network_params
 
 
+def boxcar(components: np.ndarray, width: int) -> np.ndarray:
+    """Sliding mean over the last axis, `width` samples wide (the count window T)."""
+    cumulative = np.cumsum(components, axis=-1)
+    return (cumulative[..., width:] - cumulative[..., :-width]) / width
+
+
 def _tracking(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.corrcoef(a, b)[0, 1]) if a.std() > 0 and b.std() > 0 else float("nan")
 
@@ -93,7 +99,5 @@ def run_background(config: dict, variant: str, n: int, network_index: int, lengt
         # is faster than inhibition can track. So the decomposition is repeated on currents
         # boxcar-averaged over the count window T (cf. SOM Fig. S6, filtered currents).
         width = int(round(analysis["count_window_T_ms"] / lsm["asynchrony"]["current_sample_ms"]))
-        cumulative = np.cumsum(components, axis=2)
-        filtered = (cumulative[:, :, width:] - cumulative[:, :, :-width]) / width
-        row.update({f"{k}_T": v for k, v in current_component_correlations(filtered).items()})
+        row.update({f"{k}_T": v for k, v in current_component_correlations(boxcar(components, width)).items()})
     return row

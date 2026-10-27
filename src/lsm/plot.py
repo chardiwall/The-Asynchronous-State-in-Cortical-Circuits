@@ -12,10 +12,12 @@ import numpy as np
 from config import output_path
 from lib.plotting import BLACK, BLUE, GREEN, RED
 
-VARIANT_COLOUR = {"faithful": "#7b3294", "dense_weak": "#e08214", "maass": "#018571", "input": "#8c8c8c"}
+VARIANT_COLOUR = {"faithful": "#7b3294", "dense_weak": "#e08214", "maass": "#018571", "input": "#8c8c8c",
+                  "maass2002": "#2166ac", "kaiser2017": "#c51b7d", "wijesinghe2019": "#8c510a"}
 DATASET_LABEL = {"nmnist": "N-MNIST", "dvs_gesture": "DVS Gesture"}
 VARIANT_LABEL = {"faithful": "faithful (dense, √K-scaled)", "dense_weak": "dense, weak",
-                 "maass": "Maass column", "input": "input only (no reservoir)"}
+                 "maass": "Maass column (Renart neuron)", "input": "input only (no reservoir)",
+                 "maass2002": "Maass 2002", "kaiser2017": "Kaiser 2017", "wijesinghe2019": "Wijesinghe 2019"}
 
 
 def _rows(path):
@@ -70,8 +72,8 @@ CURRENT_TERMS = [("c_EE", "c_EE", GREEN), ("c_II", "c_II", RED), ("c_XX", "c_XX"
                  ("c_total", "c (total)", BLACK)]
 
 
-def plot_currents(rows, size, out_path, suffix=""):
-    variants = [v for v in ("faithful", "dense_weak", "maass") if any(r["variant"] == v for r in rows)]
+def plot_currents(rows, size, out_path, suffix="", order=("faithful", "dense_weak", "maass")):
+    variants = [v for v in order if any(r["variant"] == v for r in rows)]
     fig, axes = plt.subplots(1, len(variants), figsize=(4 * len(variants), 3.8), sharey=True)
     for ax, v in zip(np.atleast_1d(axes), variants):
         sel = [r for r in rows if r["variant"] == v and int(r["n"]) == size]
@@ -103,9 +105,9 @@ def plot_current_scaling(rows, out_path, suffix=""):
     fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
 
 
-def plot_readout(rows, out_path):
+def plot_readout(rows, out_path, order=("input", "faithful", "dense_weak", "maass")):
     datasets = sorted({r["dataset"] for r in rows})
-    order = [v for v in ("input", "faithful", "dense_weak", "maass") if any(r["variant"] == v for r in rows)]
+    order = [v for v in order if any(r["variant"] == v for r in rows)]
     fig, axes = plt.subplots(1, len(datasets), figsize=(4.5 * len(datasets), 3.8))
     for ax, d in zip(np.atleast_1d(axes), datasets):
         found = [next((r for r in rows if r["dataset"] == d and r["variant"] == v), None) for v in order]
@@ -144,10 +146,10 @@ def plot_size_effect(rows, base_size, out_path):
     fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
 
 
-def plot_reliability(rows, out_path):
+def plot_reliability(rows, out_path, order=("input", "faithful", "dense_weak", "maass")):
     """Stimulus-locked share of each liquid's state (lsm.readout.reliability), per dataset."""
     datasets = sorted({r["dataset"] for r in rows})
-    order = [v for v in ("input", "faithful", "dense_weak", "maass") if any(r["variant"] == v for r in rows)]
+    order = [v for v in order if any(r["variant"] == v for r in rows)]
     fig, axes = plt.subplots(1, len(datasets), figsize=(4.5 * len(datasets), 3.6), sharey=True)
     for ax, d in zip(np.atleast_1d(axes), datasets):
         value = [next((float(r["reliability"]) for r in rows if r["dataset"] == d and r["variant"] == v), np.nan)

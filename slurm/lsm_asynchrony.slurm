@@ -1,10 +1,10 @@
 #!/bin/bash
 # LSM asynchrony test: one array task per (variant, N, network) background run, the grid of
-# lsm.run.asynchrony_grid (21 tasks at config.yaml's defaults). 100 s per run; the N=5000
+# lsm.run.asynchrony_grid (30 tasks at config.yaml's defaults; 21-29 are lsm.designs). 100 s per run; the N=5000
 # faithful tasks are block 3 itself and take ~15 min, the N=500 ones a few minutes.
 #SBATCH --job-name=lsm_asynchrony
 #SBATCH --partition=gpu
-#SBATCH --array=0-20
+#SBATCH --array=0-29
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=6G

@@ -425,18 +425,21 @@ lsm:
       # 3.011 and 2.884 against an UNscaled X path; at N_X=400 that path is sqrt(10) weaker,
       # so these are 3.011/sqrt(10) and 2.884/sqrt(10) -- the same networks. Rerun after any
       # change to the variants.
-    maass2002: 1.0              # lsm.designs: multiplies the design's own X weights.
-    kaiser2017: 1.0             # UNCALIBRATED placeholders until `lsm.run calibrate` is run
-    wijesinghe2019: 1.0
+    maass2002: 0.0310           # lsm.designs: multiplies the design's own X weights.
+    kaiser2017: 1.0e-4          # CALIBRATED 2026-10-27 (`lsm.run calibrate <design>`, jobs
+    wijesinghe2019: 3.873       # 3153/3155/3157) to faithful's background E rate, 1.32-1.42 Hz
+      # in those jobs (block 3's X is unseeded): maass2002 1.35 Hz, wijesinghe2019 1.41 Hz.
+      # kaiser2017 is NOT matched: it fires 4.9-5.4 Hz with zero input (rest 0.5 mV under
+      # threshold, one E->E spike worth mV), so bisection stops at the bracket's floor.
   task_input_gain:              # the same gain for classification runs, CALIBRATED
     faithful: 1.0               # 2026-10-26 by lsm.calibrate.calibrate_task to faithful's mean
     dense_weak: 0.559           # reservoir rate during stimuli, 34.9 Hz (dense_weak 34.8 Hz,
     maass: 0.216                # maass 34.2-35.1 Hz at the final brackets), on the first 6
       # DVS Gesture TRAINING samples of user01_lab. At the background-matched gains instead,
       # the same stimuli drive faithful 36 Hz, dense_weak 61 Hz, maass 206 Hz.
-    maass2002: 1.0              # UNCALIBRATED placeholders until `lsm.run calibrate_task`
-    kaiser2017: 1.0
-    wijesinghe2019: 1.0
+    maass2002: 0.01269          # CALIBRATED 2026-10-27 (`lsm.run calibrate_task dvs_gesture
+    kaiser2017: 0.001239        # <design>`, jobs 3154/3156/3158) on the same 6 samples to
+    wijesinghe2019: 5.363       # faithful's 34.81 Hz: 34.79 / 34.79 / 34.82 Hz
   calibration:
     length_s: 5.0
     gain_bounds: [0.3, 12.0]
