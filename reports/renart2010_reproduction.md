@@ -74,16 +74,19 @@ The total is only **+0.017**, and its peak shrinks from N = 1024 to 8192 (inset)
 **2C. The scaling law, the block's central result** *(reduced sweep, see §4)*. Hollow markers
 are negative values, plotted by magnitude.
 
-| N | 100 | 178 | 316 | 562 | 1000 | 1780 | 3160 |
-|---|---|---|---|---|---|---|---|
-| r̄ (EE) | 2.0e-2 | 1.3e-2 | 8.5e-3 | 4.9e-3 | 2.6e-3 | 1.4e-3 | 6.9e-4 |
-| c (total) | 0.084 | 0.069 | 0.059 | 0.049 | 0.039 | 0.031 | 0.025 |
-| c_EI | −0.10 | −0.13 | −0.16 | −0.18 | −0.18 | −0.18 | −0.17 |
+| N | 100 | 178 | 316 | 562 | 1000 | 1780 | 3160 | 5620 | 8192 |
+|---|---|---|---|---|---|---|---|---|---|
+| r̄ (EE) | 2.0e-2 | 1.3e-2 | 8.5e-3 | 4.9e-3 | 2.6e-3 | 1.4e-3 | 6.9e-4 | 3.3e-4 | 2.0e-4 |
+| c (total) | 0.084 | 0.069 | 0.059 | 0.049 | 0.039 | 0.031 | 0.025 | 0.019 | 0.016 |
+| c_EI | −0.10 | −0.13 | −0.16 | −0.18 | −0.18 | −0.18 | −0.17 | −0.16 | −0.16 |
+| c_II | 0.19 | 0.20 | 0.23 | 0.25 | 0.26 | 0.26 | 0.26 | 0.25 | 0.24 |
 
-r̄ falls exactly along 1/N: 29× over a 32× range of N. The total current correlation falls
-as ~1/√N, 3.4× against √32 = 5.7, approaching that rate at large N. The components stay
-O(0.1–0.25) and **c_EI grows more negative** as N grows. That is the cancellation: each term
-stays large, while their sum vanishes.
+**r̄ falls along 1/N**: 98× over an 82× range of N (fitted slope −1.06; realisation SEM
+under 1 % of the mean at N = 8192). **The total current correlation falls towards 1/√N**:
+the fitted slope over the whole range is −0.37, but it steepens with N, to −0.47 between
+N = 3160 and 8192. The components stay O(0.1–0.25) at every N. c_EI becomes more negative
+up to N ≈ 600 and then holds at about −0.16, while c_EE and c_II shrink slightly with it.
+That is the cancellation: each term stays large, while their sum vanishes.
 
 ![Fig. 2G](figures/fig2g.png)
 
@@ -165,7 +168,8 @@ and almost nothing is left. In vitro this needs only paired whole-cell recording
 
 ## 4. Deviations to state on the slides
 
-- **Fig. 2C is a reduced sweep**: 40 000 τ per realisation and 5–20 realisations per N, against
+- **Fig. 2C is a reduced sweep**: 40 000 τ per realisation, and 5–20 realisations per N for r̄
+  (2–3 for the current decomposition), against
   the paper's 200 000 τ and 50. Every N up to 8192 is kept, and each point's noise is ~√5
   wider. The paper's protocol costs ~16–24 h per N = 8192 realisation here.
 - **I rate 3.98 Hz vs 3.6 Hz** (+10 %), consistent over all 10 networks. E rate and r̄ are on

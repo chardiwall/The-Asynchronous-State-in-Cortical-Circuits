@@ -24,7 +24,8 @@ How can dense networks be asynchronous? Shared input should force correlations o
 
 **5. Fig. 2E/2C — the cancellation and the 1/N law (2 min).** `fig2e.png`, `fig2c.png`
 - At N = 8192: II +0.25, EE +0.11, XX +0.04, EI −0.16 → total +0.017.
-- r̄ falls as 1/N (2.0e-2 → 6.9e-4 over N = 100 → 3160), c as ~1/√N; components stay O(1).
+- r̄ falls as 1/N (2.0e-2 → 2.0e-4 over N = 100 → 8192, slope −1.06). c falls towards 1/√N
+  (0.084 → 0.016; local slope −0.47 at the largest N). The components stay O(0.1–0.25).
 - Say: "nothing is fine-tuned; the cancellation is dynamical."
 
 **6. Fig. 3A/3B — a realistic conductance-based network (2 min).** `fig3a.png`, `fig3b.png`
