@@ -12,6 +12,9 @@ Extension of Renart et al. (2010) to reservoir computing. Code: `src/lsm/` (entr
 2. What must be adjusted to make an LSM **faithful** to the paper's argument?
 3. Is the faithful LSM a **better liquid** for event-camera classification (N-MNIST, DVS
    Gesture) than a classic Maass-style liquid?
+4. Do the **published** liquids (Maass 2002, Kaiser 2017, Wijesinghe 2019, built as their
+   authors specified) show the asynchronous state, and does their correlation structure
+   (c_II, c_EI, …) predict their accuracy? (§7)
 
 ## 1. What the paper's argument requires
 
@@ -280,7 +283,181 @@ readout:
    N = 5000–10 000 and a less chaotic balanced regime (weaker J, slower inhibition) are the
    natural next experiments.
 
-## 7. Reproduce
+## 7. Published LSM designs: Maass 2002, Kaiser 2017, Wijesinghe 2019
+
+The three variants above all use the paper's conductance-based neuron. This section asks the
+same questions of three liquids **as their authors built them**: the trio compared by Woo et
+al. 2024 (*Physica A* 633:129334, Table 1), all at N = 500 (400 E / 100 I). Code:
+`src/lsm/designs.py`, parameters: `config.yaml → lsm.designs`, tests:
+`tests/lsm/test_designs.py`.
+
+### 7.1 What was built, and from which source
+
+| | Maass 2002 | Kaiser 2017 | Wijesinghe 2019 |
+|---|---|---|---|
+| Source of every value | paper, Appendix B | released NEST code (IGITUGraz/LSM) | paper, Tables 1–2; Diehl & Cook 2015 |
+| Neuron | current LIF, τ_m 30 ms, R 1 MΩ, I_back 13.5 nA | current LIF, τ_m 30 ms, R 1 GΩ, I_e 14.5 pA | conductance LIF, τ_m 100 / 10 ms (E/I) |
+| Rest vs threshold | 13.5 vs 15 mV | 14.5 vs 15 mV | −65 vs −52 mV (E), no background |
+| Synapse | exp. PSC 3/6 ms, Tsodyks–Markram STP, U/D/F ~ N(mean, 50 %) | exp. PSC 3/2 ms, STP fixed per pair | exp. conductance 1/2 ms, static |
+| Weights | gamma, CV 1: 30, 60, −19, −19 nA | clipped normal, CV 0.7: 50, 250, −200, −200 pA | U(0, 1) nS |
+| Wiring | 5×5×20 column, C·e^{−(D/λ)²}, λ = 2 | fixed in-degree 2 E + 1 I | Bernoulli 0.4 / 0.4 / 0.5, no I→I |
+| Links | 3620 (review: 3630 ± 15) | 1500 (exact) | 99 840 expected (exact up to sampling) |
+| Delays | 1.5 ms (E→E), 0.8 ms | clipped normal, mean 10, SD 20, [3, 200] ms | none |
+| Input | each channel → 30 % of neurons, 18 / 9 nA | out-degree 100 → E only, U(125, 375) pA | 10 % → E only, U(0, 1) nS |
+| Noise | none | independent 25 Hz Poisson per neuron, N(1, 0.7) pA | none |
+
+The tests check, against independent sources:
+- the review's link counts, including Kaiser's exact in-degrees;
+- the STP jump sizes, against Markram's closed-form recursion;
+- each neuron's rest point and its synaptic-current decay.
+
+Choices and deviations to state:
+- **The review's Maass link split is not Maass's.** Its 594 / 578 / 143 links (E→I, I→E,
+  I→I) are what C = 0.3 for every pair gives. Maass's own C is 0.3 / 0.2 / 0.4 / 0.1, which
+  gives 398 / 793 / 47. The primary source is followed; the total agrees either way.
+- **Inferred values.** Maass's input synapses are static and undelayed, since he gives
+  neither STP nor delay for them. Negative U/D/F draws are redrawn from U(0, 2·mean), his
+  "appropriate uniform distribution".
+- **Starting state.** Every STP synapse starts at rest (u = 0, x = 1). Kaiser's code starts
+  at a 10 Hz steady state computed with mixed ms/s units; the difference lasts about
+  τ_rec ≤ 0.8 s.
+- **Reversal potentials.** Wijesinghe et al. state none; Diehl & Cook's are used (0 mV, and
+  −100 / −85 mV for inhibition onto E / I cells).
+- **Input gain.** Each design's input weights were set for its authors' input, so one gain
+  on all X weights is calibrated, as for every other variant.
+  - The task gains match faithful's driven rate of 34.8 Hz: Maass 2002 0.0127, Kaiser 2017
+    0.00124, Wijesinghe 2019 5.36.
+  - The background gains match faithful's E rate of about 1.4 Hz: Maass 2002 0.031,
+    Wijesinghe 2019 3.87.
+  - **Kaiser 2017 cannot be matched at background.** It fires at 4.9–5.4 Hz with zero input,
+    because its cells rest 0.5 mV under threshold and a single E→E spike is worth several
+    mV. It is reported at the bracket's floor (gain 10⁻⁴), so its background row is not at
+    equal rate.
+
+### 7.2 Asynchrony at background (question 1, for the published designs)
+
+Background X only (2.5 Hz Poisson), 3 networks × 100 s, N = 500, T = 50 ms:
+
+| liquid | E / I rate (Hz) | r̄ | σ_r (null) | c_EE | c_II | c_EI | c (total) | E–I tracking |
+|---|---|---|---|---|---|---|---|---|
+| faithful (√K-scaled) | 1.38 / 3.77 | **0.012** | 0.026 (0.018) | 0.13 | 0.72 | −0.28 | **0.05** | 0.60 |
+| dense_weak | 1.42 / 2.18 | 0.019 | 0.027 (0.019) | 0.03 | 0.15 | −0.06 | 0.08 | 0.59 |
+| Maass column (Renart neuron) | 1.50 / 1.53 | 0.039 | 0.032 (0.019) | 0.00 | 0.00 | 0.00 | 0.15 | 0.64 |
+| **Maass 2002** | 1.41 / 1.44 | **0.68** | 0.20 (0.03) | 1.03 | 0.19 | −0.42 | **0.40** | 0.92 |
+| **Kaiser 2017** (not rate-matched) | 4.48 / 16.0 | 0.044 | 0.063 (0.018) | 0.02 | 0.04 | −0.02 | 0.02 | 0.43 |
+| **Wijesinghe 2019** | 1.35 / 6.36 | 0.022 | 0.029 (0.018) | 0.15 | 1.07 | −0.29 | **0.59** | 0.67 |
+
+![rasters](figures/lsm_designs_rasters.png)
+![background current decomposition](figures/lsm_designs_currents_T.png)
+
+**None of the published liquids is asynchronous by the paper's mechanism.**
+
+- **Maass 2002 is in an avalanche regime.**
+  - Over 20 s it is silent 96 % of the time. About every 3 s it fires a 60–80 ms population
+    burst that recruits 84–96 % of all E cells.
+  - That is why r̄ = 0.68, and why c_EE = 1.03 is only partly cancelled by c_EI = −0.42.
+  - The same column with the Renart neuron (the "maass" variant) sits at r̄ = 0.039. The
+    neuron and synapse model, not the wiring, creates the bursts: cells rest 1.5 mV below
+    threshold, the weights are heavy-tailed (gamma, CV 1), and depression ends each burst.
+- **Wijesinghe 2019 oscillates.**
+  - It fires inhibitory population volleys at roughly 10 Hz (raster). With no I→I synapses,
+    nothing desynchronises the I population.
+  - So c_II = 1.07 stands nearly uncancelled, and c reaches 0.59, the highest of all.
+  - Spike-count r̄ stays low (0.022) because each E cell joins only a few volleys: 1.35 Hz
+    against a ~10 Hz rhythm.
+- **Kaiser 2017 is decorrelated by sparseness, not by balance.**
+  - With 2 E + 1 I inputs per cell, two cells almost never share an input, so every
+    component is small (c = 0.02). There is nothing to cancel.
+  - Its spiking is not asynchronous all the same: σ_r is 3.5× its null. This is the
+    sparse-network route of van Vreeswijk & Sompolinsky, not the dense route this paper is
+    about.
+- **Only the faithful liquid** has large components (c_II = 0.72, c_EE = 0.13) cancelled by
+  a large negative c_EI (−0.28) down to c = 0.05. That is the paper's signature.
+
+### 7.3 Asynchrony while driven: signal and noise correlations
+
+Background asynchrony is the paper's definition. A liquid, however, computes while driven. So
+the 100 reliability test samples were run twice through each reservoir, with independent
+input noise (`src/lsm/driven.py`). With x_k = s + n_k for repeats k = 1, 2:
+- the cross-repeat covariance gives the stimulus-locked (signal) part;
+- the repeat difference gives the trial-to-trial (noise) part, which is what the asynchrony
+  claim is about;
+- the same difference applied to the T-averaged currents gives a noise c-decomposition.
+
+Spike-count correlations of E cells (T = 50 ms) and the total noise current correlation:
+
+| liquid | N-MNIST: r_total / r_signal / r_noise / c_noise | DVS Gesture: r_total / r_signal / r_noise / c_noise |
+|---|---|---|
+| faithful | 0.038 / 0.155 / **0.004** / **0.013** | 0.032 / 0.065 / **0.004** / **0.009** |
+| dense_weak | 0.089 / 0.118 / 0.002 / 0.014 | 0.078 / 0.092 / 0.004 / 0.013 |
+| Maass column | 0.355 / 0.384 / 0.020 / 0.073 | 0.375 / 0.392 / 0.036 / 0.076 |
+| Maass 2002 | 0.675 / 0.757 / **0.024** / **0.121** | 0.701 / 0.767 / **0.048** / **0.128** |
+| Kaiser 2017 | 0.547 / 0.661 / 0.007 / 0.013 | 0.374 / 0.473 / 0.012 / 0.016 |
+| Wijesinghe 2019 | 0.035 / 0.055 / 0.000 / 0.094 | 0.053 / 0.065 / 0.002 / 0.053 |
+
+![driven noise decomposition, N-MNIST](figures/lsm_designs_driven_nmnist.png)
+
+- **The paper's mechanism survives drive, and only in the faithful liquid.** Its noise
+  currents still cancel: c_EE 0.24 + c_II 0.37 + 2c_EI −0.49 + … = 0.013. The other liquids
+  have small components and nothing to cancel, apart from Wijesinghe's uncancelled c_II.
+- **Most of a liquid's correlation under drive is stimulus-locked.** Kaiser's r_total of
+  0.55 is almost all signal: its r_noise is 0.007. Correlated firing that repeats on every
+  presentation carries the stimulus; it is not noise.
+
+### 7.4 Classification
+
+| test accuracy (%) | input | faithful | dense_weak | Maass column | **Maass 2002** | **Kaiser 2017** | **Wijesinghe 2019** |
+|---|---|---|---|---|---|---|---|
+| N-MNIST (n = 2000, ±~0.9) | 96.0 | 91.3 | 97.0 | 97.1 | 96.4 | 95.3 | 96.4 |
+| DVS Gesture (n = 264, ±~5.8) | 57.6 | 53.8 | 60.6 | 60.6 | **65.9** | **66.3** | 58.3 |
+| stimulus-locked share, N-MNIST | 0.90 | 0.28 | 0.77 | 0.88 | 0.74 | 0.51 | 0.69 |
+| stimulus-locked share, Gesture | 0.97 | 0.66 | 0.94 | 0.99 | 0.98 | 0.90 | 0.97 |
+| participation ratio, Gesture / N-MNIST | 114 / 229 | 105 / 179 | 47 / 94 | 5 / 10 | 2.5 / 7.8 | 7.5 / 22 | 24 / 56 |
+
+![readout](figures/lsm_designs_readout.png)
+
+- **N-MNIST:** the published designs land between faithful and the best liquids. None beats
+  the input-only baseline by more than its CI.
+- **DVS Gesture:** Maass 2002 and Kaiser 2017 are the best liquids measured (≈ 66 %). They
+  are clearly above faithful (53.8 %, non-overlapping 95 % intervals), but not separable
+  from the Maass column or dense_weak (60.6 %) on 264 test samples.
+
+### 7.5 Do correlations predict performance?
+
+![accuracy against each correlation measure](figures/lsm_designs_vs_accuracy.png)
+
+Six liquids per dataset, so the Spearman ρ values are a trend, not a test:
+
+| Spearman ρ with accuracy | r̄ | c_II | c_EI | c (total) | r_noise (driven) | c_noise (driven) | stimulus-locked share |
+|---|---|---|---|---|---|---|---|
+| N-MNIST | +0.17 | −0.49 | +0.35 | +0.46 | +0.12 | +0.52 | **+0.99** |
+| DVS Gesture | **+0.84** | −0.61 | +0.20 | −0.23 | +0.72 | +0.46 | +0.23 |
+
+1. **No asynchrony measure predicts accuracy in the paper's direction.** Lower r̄, lower c or
+   a more negative c_EI never goes with higher accuracy. On Gesture the trend runs the other
+   way: the two most correlated liquids (Maass 2002 and Kaiser) are the best.
+2. **c_II has a negative trend on both datasets** (ρ = −0.49 and −0.61). Large shared
+   inhibition goes with lower accuracy. It belongs to faithful (balanced) and Wijesinghe
+   (oscillating), whose shared inhibition is strong for opposite reasons.
+3. **Reliability is the best single predictor on N-MNIST** (ρ = +0.99): the share of the
+   liquid's state that repeats across presentations. On Gesture every liquid but faithful is
+   above 0.9, so it saturates there, and the ordering among the rest is not resolved.
+
+### 7.6 Conclusions for the published designs
+
+- **Does the asynchronous state appear in the published LSMs? No.** At equal rate their
+  background r̄ spans 0.02 to 0.68. Maass 2002 bursts, Wijesinghe 2019 oscillates, and
+  Kaiser 2017 is decorrelated only by being sparse. Cancellation by tracking inhibition
+  appears only in the liquid built for it (faithful), at background and under drive.
+- **Does performance change? Yes, by up to 12.5 points on DVS Gesture**, but not in the
+  direction the asynchrony claim would suggest. The best gesture liquids are the most
+  correlated ones, and the most asynchronous liquid is the worst on both datasets.
+- **What predicts a good liquid here is reliability, not asynchrony.** A liquid helps when
+  its state is stimulus-locked, and correlated, even bursty, activity is fine if it repeats.
+  Asynchrony earned through chaotic balance trades reliability away (§6.1). That is the
+  computational cost of the paper's mechanism at reservoir size.
+
+## 8. Reproduce
 
 ```bash
 PYTHONPATH=src python -m lsm.run calibrate                 # background gains (5 min)
@@ -299,4 +476,20 @@ done
 PYTHONPATH=src python -m lsm.run aggregate
 PYTHONPATH=src python -m lsm.run readout dvs_gesture && PYTHONPATH=src python -m lsm.run readout nmnist
 PYTHONPATH=src python -m lsm.run plot
+# §7, the published designs (after the above):
+for d in maass2002 kaiser2017 wijesinghe2019; do
+  sbatch slurm/lsm_calibrate.slurm calibrate $d                     # then copy gains into
+  sbatch slurm/lsm_calibrate.slurm calibrate_task dvs_gesture $d    # config.yaml lsm.*gain
+done
+sbatch --array=21-29 slurm/lsm_asynchrony.slurm
+for d in maass2002 kaiser2017 wijesinghe2019; do
+  sbatch --array=0-23 slurm/lsm_features.slurm nmnist $d
+  sbatch --array=0-13 slurm/lsm_features.slurm dvs_gesture $d
+  for s in nmnist dvs_gesture; do sbatch slurm/lsm_reliability.slurm $s $d; done
+done
+for v in faithful dense_weak maass maass2002 kaiser2017 wijesinghe2019; do
+  for s in nmnist dvs_gesture; do sbatch slurm/lsm_driven.slurm $s $v; done
+done
+PYTHONPATH=src python -m lsm.run aggregate && PYTHONPATH=src python -m lsm.run readout nmnist
+PYTHONPATH=src python -m lsm.run readout dvs_gesture && PYTHONPATH=src python -m lsm.plot_designs
 ```

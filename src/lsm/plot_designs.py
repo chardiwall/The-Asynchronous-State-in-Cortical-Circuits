@@ -5,8 +5,9 @@ variants, and every liquid's correlation structure beside its accuracy.
   lsm_designs_driven_<dataset>.png  driven-state NOISE c-decomposition, per liquid
   lsm_designs_readout.png           test accuracy, every liquid, both datasets
   lsm_designs_reliability.png       stimulus-locked share of the liquid state
-  lsm_designs_vs_accuracy.png       accuracy against each correlation measure, one point per
-                                    liquid (Spearman rho over 6 points: a trend, not a test)
+  lsm_designs_vs_accuracy.png       accuracy against each correlation measure and the
+                                    stimulus-locked share, one point per liquid (Spearman rho
+                                    over 6 points: a trend, not a test)
 
     python -m lsm.plot_designs
 """
@@ -30,7 +31,8 @@ MEASURES = [("background", "r_bar", "r̄, background"),
             ("background", "c_EI_T", "c_EI, background"),
             ("background", "c_total_T", "c (total), background"),
             ("driven", "r_noise", "r noise, driven"),
-            ("driven", "c_total_noise", "c noise (total), driven")]
+            ("driven", "c_total_noise", "c noise (total), driven"),
+            ("reliability", "reliability", "stimulus-locked share")]
 
 
 def _background(rows, size):
@@ -44,14 +46,15 @@ def _background(rows, size):
     return out
 
 
-def plot_vs_accuracy(background, driven, readout, out_path):
+def plot_vs_accuracy(background, driven, reliability, readout, out_path):
     datasets = sorted({r["dataset"] for r in readout})
     fig, axes = plt.subplots(len(datasets), len(MEASURES), figsize=(2.6 * len(MEASURES), 2.8 * len(datasets)),
                              squeeze=False)
     for row_axes, d in zip(axes, datasets):
         accuracy = {r["variant"]: 100 * float(r["test_accuracy"]) for r in readout if r["dataset"] == d}
         for ax, (kind, key, label) in zip(row_axes, MEASURES):
-            source = background if kind == "background" else driven.get(d, {})
+            source = {"background": background, "driven": driven.get(d, {}),
+                      "reliability": reliability.get(d, {})}[kind]
             points = [(v, source[v][key], accuracy[v]) for v in LIQUIDS
                       if v in accuracy and v in source and np.isfinite(source[v].get(key, np.nan))]
             for v, x, y in points:
@@ -67,6 +70,29 @@ def plot_vs_accuracy(background, driven, readout, out_path):
     handles = [plt.Line2D([], [], marker="o", ls="", ms=8, color=VARIANT_COLOUR[v], label=VARIANT_LABEL[v]) for v in LIQUIDS]
     fig.legend(handles=handles, loc="lower center", ncol=len(LIQUIDS), frameon=False, fontsize=8)
     fig.tight_layout(rect=(0, 0.06, 1, 1)); fig.savefig(out_path, dpi=180); plt.close(fig)
+
+
+def plot_rasters(config, out_path, length_ms=1000.0, liquids=("faithful", "maass2002", "kaiser2017", "wijesinghe2019")):
+    """One background second of each liquid (network 0 of the asynchrony runs), E green, I red."""
+    import brian2 as b2
+    from lib.plotting import GREEN, RED
+    from lsm.asynchrony import build_background
+
+    burn_in = config["spiking_network"]["burn_in_ms"]
+    fig, axes = plt.subplots(len(liquids), 1, figsize=(8, 1.9 * len(liquids)), sharex=True)
+    for ax, v in zip(axes, liquids):
+        net, params, _ = build_background(config, v, config["lsm"]["size"], 0)
+        net.network.run((burn_in + length_ms) * b2.ms)
+        n_e = params["populations"]["n_excitatory"]
+        for spikes, offset, colour in ((net.spikes_e, 0, GREEN), (net.spikes_i, n_e, RED)):
+            t = np.asarray(spikes.t / b2.ms) - burn_in
+            keep = t >= 0
+            ax.plot(t[keep], np.asarray(spikes.i)[keep] + offset, "|", ms=2, color=colour)
+        ax.set(ylabel="neuron", ylim=(0, config["lsm"]["size"]))
+        ax.set_title(VARIANT_LABEL[v], fontsize=9, loc="left")
+        _style(ax)
+    axes[-1].set_xlabel("time (ms), background input only")
+    fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
 
 
 def main(config: dict) -> None:
@@ -88,7 +114,10 @@ def main(config: dict) -> None:
     reliability = [json.load(open(p)) for p in sorted(glob.glob(f"{features}/*/reliability_*.json"))]
     plot_reliability([r for r in reliability if "_N" not in r["variant"]], f"{out_dir}/lsm_designs_reliability.png",
                      order=("input", *LIQUIDS))
-    plot_vs_accuracy(_background(asynchrony, size), driven, readout, f"{out_dir}/lsm_designs_vs_accuracy.png")
+    by_dataset = {}
+    for r in reliability:
+        by_dataset.setdefault(r["dataset"], {})[r["variant"]] = r
+    plot_vs_accuracy(_background(asynchrony, size), driven, by_dataset, readout, f"{out_dir}/lsm_designs_vs_accuracy.png")
     print(f"design figures in {out_dir}/")
 
 

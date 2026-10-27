@@ -59,6 +59,8 @@ from the 2026-10-26 cluster pass are in [`reports/`](reports/):
 - [`reports/lsm_technical.md`](reports/lsm_technical.md) — an extension beyond the paper
   (`src/lsm/`): does the asynchronous state survive in a 500-neuron liquid state machine,
   what a faithful LSM needs, and whether it classifies N-MNIST / DVS Gesture better.
+  §7 adds the published liquids of Maass 2002, Kaiser 2017 and Wijesinghe 2019, with
+  their correlation structure (c_II, c_EI, …) against accuracy.
 
 Each block's own README is the run guide: exact commands per panel, which `config.yaml` keys
 trade cost against accuracy, the paper's target result, and that block's known deviations
@@ -76,7 +78,7 @@ flagged at the top of [`src/block3/README.md`](src/block3/README.md).
 | `src/config.py` | The `config.yaml` loader and `output_path`, the one place output locations are resolved |
 | `src/lib/` | Machinery: Numba kernels, Brian2 batching, chunking, Slurm-array bookkeeping, plotting helpers |
 | `src/block1/`, `src/block2/`, `src/block3/` | One directory per figure, each with its own README |
-| `src/lsm/` | The liquid-state-machine extension (not in the paper): block 3's network at reservoir size, three variants, event-camera readout |
+| `src/lsm/` | The liquid-state-machine extension (not in the paper): block 3's network at reservoir size, three variants, three published liquids (`designs.py`), event-camera readout |
 | `reports/` | Results reports and their figures |
 | `slurm/` | Cluster job scripts, named by block and figure |
 | `tests/` | Tests, written before the code they cover |

@@ -20,6 +20,12 @@ VARIANT_LABEL = {"faithful": "faithful (dense, √K-scaled)", "dense_weak": "den
                  "maass2002": "Maass 2002", "kaiser2017": "Kaiser 2017", "wijesinghe2019": "Wijesinghe 2019"}
 
 
+def _ticks(ax, order):
+    """Variant names under bars; angled once there are more bars than fit flat."""
+    ax.set_xticks(range(len(order)), [VARIANT_LABEL[v].replace(" (", "\n(") for v in order], fontsize=7,
+                  rotation=30 if len(order) > 4 else 0, ha="right" if len(order) > 4 else "center")
+
+
 def _rows(path):
     with open(path, newline="") as f:
         return list(csv.DictReader(f))
@@ -86,7 +92,8 @@ def plot_currents(rows, size, out_path, suffix="", order=("faithful", "dense_wea
         ax.set_xticks(range(len(values)), [label for _, label, _ in CURRENT_TERMS], rotation=45, fontsize=8)
         ax.set_title(f"{VARIANT_LABEL[v]}, N={size}", fontsize=9)
         _style(ax)
-    np.atleast_1d(axes)[0].set_ylabel("current-correlation term" + (" (T-averaged)" if suffix else " (1 ms)"))
+    np.atleast_1d(axes)[0].set_ylabel("current-correlation term " + {"": "(1 ms)", "_T": "(T-averaged)",
+                                      "_noise": "(trial-to-trial noise, T-averaged)"}[suffix])
     fig.tight_layout(); fig.savefig(out_path, dpi=180); plt.close(fig)
 
 
@@ -108,7 +115,7 @@ def plot_current_scaling(rows, out_path, suffix=""):
 def plot_readout(rows, out_path, order=("input", "faithful", "dense_weak", "maass")):
     datasets = sorted({r["dataset"] for r in rows})
     order = [v for v in order if any(r["variant"] == v for r in rows)]
-    fig, axes = plt.subplots(1, len(datasets), figsize=(4.5 * len(datasets), 3.8))
+    fig, axes = plt.subplots(1, len(datasets), figsize=(max(4.5, 0.9 * len(order)) * len(datasets), 3.8))
     for ax, d in zip(np.atleast_1d(axes), datasets):
         found = [next((r for r in rows if r["dataset"] == d and r["variant"] == v), None) for v in order]
         acc = np.array([100 * float(r["test_accuracy"]) if r else np.nan for r in found])
@@ -119,7 +126,7 @@ def plot_readout(rows, out_path, order=("input", "faithful", "dense_weak", "maas
                width=0.7, edgecolor="white", error_kw={"lw": 1})
         for i, (a, e) in enumerate(zip(acc, ci)):
             ax.text(i, a + e + 0.5, f"{a:.1f}%", ha="center", va="bottom", fontsize=9)
-        ax.set_xticks(range(len(order)), [VARIANT_LABEL[v].replace(" (", "\n(") for v in order], fontsize=7)
+        _ticks(ax, order)
         n_test = int(float(found[0]["n_test"])) if found[0] else 0
         ax.set(ylabel="test accuracy (%)", ylim=(0, 108), title=f"{DATASET_LABEL.get(d, d)} (n_test = {n_test}, ±95% CI)")
         _style(ax)
@@ -150,14 +157,14 @@ def plot_reliability(rows, out_path, order=("input", "faithful", "dense_weak", "
     """Stimulus-locked share of each liquid's state (lsm.readout.reliability), per dataset."""
     datasets = sorted({r["dataset"] for r in rows})
     order = [v for v in order if any(r["variant"] == v for r in rows)]
-    fig, axes = plt.subplots(1, len(datasets), figsize=(4.5 * len(datasets), 3.6), sharey=True)
+    fig, axes = plt.subplots(1, len(datasets), figsize=(max(4.5, 0.9 * len(order)) * len(datasets), 3.6), sharey=True)
     for ax, d in zip(np.atleast_1d(axes), datasets):
         value = [next((float(r["reliability"]) for r in rows if r["dataset"] == d and r["variant"] == v), np.nan)
                  for v in order]
         ax.bar(range(len(order)), value, color=[VARIANT_COLOUR[v] for v in order], width=0.7, edgecolor="white")
         for i, x in enumerate(value):
             ax.text(i, x + 0.02, f"{x:.2f}", ha="center", va="bottom", fontsize=9)
-        ax.set_xticks(range(len(order)), [VARIANT_LABEL[v].replace(" (", "\n(") for v in order], fontsize=7)
+        _ticks(ax, order)
         ax.set(ylim=(0, 1.1), title=DATASET_LABEL.get(d, d))
         _style(ax)
     np.atleast_1d(axes)[0].set_ylabel("stimulus-locked share of state variance")
